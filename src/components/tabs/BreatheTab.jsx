@@ -16,92 +16,136 @@ export default function BreatheTab({ theme, onVoiceNeeded }) {
   if (showSOS) return <SOSMode onClose={() => setShowSOS(false)} />
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '20px 16px' }}>
+    <div style={{ padding: '20px 16px 32px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-      {/* SOS button — always prominent */}
+      {/* SOS */}
       <button onClick={() => setShowSOS(true)} style={{
-        width: '100%', padding: '16px', borderRadius: 16,
-        background: 'linear-gradient(135deg, #1E0A0F, #2A1020)',
-        border: '1px solid #FB7185',
-        color: '#FB7185', fontSize: 16, fontWeight: 600, cursor: 'pointer',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-      }}>
-        <span style={{ fontSize: 24 }}>🆘</span>
-        Anxiety SOS — I need help right now
-      </button>
-
-      {/* Breathing exercise */}
-      <div style={{ background: theme.bgCard, borderRadius: 16, border: `1px solid ${theme.border}`, overflow: 'hidden' }}>
-        <div style={{ padding: '14px 16px', borderBottom: showBreathing ? `1px solid ${theme.border}` : 'none' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ fontSize: 15, fontWeight: 500, color: theme.text }}>🫁 Guided breathing</div>
-              <div style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>Box, 4-7-8, or deep breath</div>
-            </div>
-            <button onClick={() => setShowBreathing(v => !v)} style={{
-              padding: '6px 14px', borderRadius: 8, border: `1px solid ${theme.border}`,
-              background: theme.bgInput, color: theme.textMuted, fontSize: 13, cursor: 'pointer',
-            }}>
-              {showBreathing ? 'Close' : 'Start'}
-            </button>
+        width: '100%', padding: '18px 20px',
+        borderRadius: 'var(--radius-lg)',
+        background: 'linear-gradient(135deg, rgba(248,113,113,0.12), rgba(244,63,94,0.08))',
+        border: '1.5px solid rgba(248,113,113,0.3)',
+        color: 'var(--danger)', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', gap: 14,
+        transition: 'all var(--transition-fast)',
+      }}
+        onMouseEnter={e => e.currentTarget.style.background = 'rgba(248,113,113,0.18)'}
+        onMouseLeave={e => e.currentTarget.style.background = 'linear-gradient(135deg, rgba(248,113,113,0.12), rgba(244,63,94,0.08))'}
+      >
+        <div style={{
+          width: 44, height: 44, borderRadius: 12,
+          background: 'rgba(248,113,113,0.15)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0,
+        }}>🆘</div>
+        <div style={{ textAlign: 'left' }}>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>Anxiety SOS</div>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+            Instant grounding when panic hits
           </div>
         </div>
-        {showBreathing && <BreathingExercise onClose={() => setShowBreathing(false)} />}
+        <svg style={{ marginLeft: 'auto' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 18l6-6-6-6"/>
+        </svg>
+      </button>
+
+      {/* Breathing */}
+      <div className="card" style={{ overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: theme.primary + '18',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
+            }}>🫁</div>
+            <div>
+              <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>Guided breathing</p>
+              <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 1 }}>Box · 4-7-8 · Deep breath</p>
+            </div>
+          </div>
+          <button className={`btn btn-sm ${showBreathing ? 'btn-ghost' : ''}`}
+            style={{ background: showBreathing ? 'transparent' : theme.primary, border: 'none', color: showBreathing ? 'var(--text-secondary)' : '#fff' }}
+            onClick={() => setShowBreathing(v => !v)}>
+            {showBreathing ? 'Close' : 'Start'}
+          </button>
+        </div>
+        {showBreathing && (
+          <div style={{ marginTop: 16, borderTop: '1px solid var(--border-subtle)', paddingTop: 4 }}>
+            <BreathingExercise onClose={() => setShowBreathing(false)} />
+          </div>
+        )}
       </div>
 
       {/* Body scan */}
-      <div style={{ background: theme.bgCard, borderRadius: 16, border: `1px solid ${theme.border}`, overflow: 'hidden' }}>
-        <div style={{ padding: '14px 16px', borderBottom: showBodyScan ? `1px solid ${theme.border}` : 'none' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="card" style={{ overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: theme.primary + '18',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
+            }}>🧘</div>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 500, color: theme.text }}>🧘 Body scan</div>
-              <div style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>5-minute guided relaxation</div>
+              <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>Body scan</p>
+              <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 1 }}>5-minute guided relaxation</p>
             </div>
-            <button onClick={() => setShowBodyScan(v => !v)} style={{ padding: '6px 14px', borderRadius: 8, border: `1px solid ${theme.border}`, background: theme.bgInput, color: theme.textMuted, fontSize: 13, cursor: 'pointer' }}>
-              {showBodyScan ? 'Close' : 'Start'}
-            </button>
           </div>
+          <button className="btn btn-sm"
+            style={{ background: showBodyScan ? 'transparent' : theme.primary + '18', border: `1px solid ${theme.primary}30`, color: showBodyScan ? 'var(--text-secondary)' : theme.primary }}
+            onClick={() => setShowBodyScan(v => !v)}>
+            {showBodyScan ? 'Close' : 'Start'}
+          </button>
         </div>
-        {showBodyScan && <BodyScan theme={theme} onClose={() => setShowBodyScan(false)} />}
+        {showBodyScan && (
+          <div style={{ marginTop: 16, borderTop: '1px solid var(--border-subtle)', paddingTop: 4 }}>
+            <BodyScan theme={theme} onClose={() => setShowBodyScan(false)} />
+          </div>
+        )}
       </div>
 
       {/* Ambient sounds */}
       <AmbientSounds theme={theme} />
 
       {/* Affirmations */}
-      <div style={{ background: theme.bgCard, borderRadius: 16, padding: 16, border: `1px solid ${theme.border}` }}>
-        <div style={{ fontSize: 12, color: theme.textMuted, fontWeight: 500, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12 }}>
-          ✨ Affirmations
-        </div>
+      <div className="card">
+        <p className="section-label" style={{ marginBottom: 14 }}>✨ Affirmations</p>
         <AffirmationWall theme={theme} aiAffirmations={affirmations} />
-        <button onClick={() => {
-          session.mode = 'affirmations'
-          notify()
-          onVoiceNeeded()
-        }} style={{ width: '100%', marginTop: 12, padding: '10px 0', borderRadius: 10, border: 'none', background: theme.primary, color: 'white', fontSize: 13, cursor: 'pointer' }}>
+        <button className="btn btn-primary" onClick={() => {
+          session.mode = 'affirmations'; notify(); onVoiceNeeded()
+        }} style={{
+          width: '100%', marginTop: 12, background: theme.primary, border: 'none',
+          boxShadow: `0 2px 8px ${theme.glow}`,
+        }}>
           ✨ Generate new affirmations
         </button>
       </div>
 
       {/* Crisis resources */}
-      <div style={{ background: theme.bgCard, borderRadius: 16, padding: 16, border: `1px solid ${theme.border}` }}>
-        <div style={{ fontSize: 12, color: theme.textMuted, fontWeight: 500, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12 }}>
-          Support resources
+      <div className="card">
+        <p className="section-label" style={{ marginBottom: 14 }}>💙 Support resources</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          {[
+            { label: 'iCall India', detail: '9152987821', href: 'https://icallhelpline.org', emoji: '📞' },
+            { label: 'Vandrevala Foundation', detail: '1860-2662-345 · 24/7', href: 'https://www.vandrevalafoundation.com', emoji: '📞' },
+            { label: 'Online chat support', detail: 'icallhelpline.org', href: 'https://icallhelpline.org', emoji: '💬' },
+          ].map((r, i, arr) => (
+            <a key={r.label} href={r.href} target="_blank" rel="noopener noreferrer" style={{
+              display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0',
+              borderBottom: i < arr.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+              textDecoration: 'none', transition: 'opacity var(--transition-fast)',
+            }}
+              onMouseEnter={e => e.currentTarget.style.opacity = '0.7'}
+              onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+            >
+              <span style={{ fontSize: 18 }}>{r.emoji}</span>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 500 }}>{r.label}</p>
+                <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 1 }}>{r.detail}</p>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
+              </svg>
+            </a>
+          ))}
         </div>
-        {[
-          { label: 'iCall (India)', detail: '9152987821', href: 'https://icallhelpline.org' },
-          { label: 'Vandrevala Foundation', detail: '1860-2662-345 · 24/7', href: 'https://www.vandrevalafoundation.com' },
-          { label: 'iCall chat support', detail: 'icallhelpline.org', href: 'https://icallhelpline.org' },
-        ].map(r => (
-          <a key={r.label} href={r.href} target="_blank" rel="noopener noreferrer" style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            padding: '10px 0', borderBottom: `1px solid ${theme.border}`,
-            textDecoration: 'none',
-          }}>
-            <span style={{ color: theme.text, fontSize: 14 }}>{r.label}</span>
-            <span style={{ color: theme.textMuted, fontSize: 12 }}>{r.detail}</span>
-          </a>
-        ))}
       </div>
 
     </div>

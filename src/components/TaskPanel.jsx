@@ -23,9 +23,9 @@ const TaskPanel = ({ session, onTaskSet }) => {
   return (
     <div style={{ 
       padding: '24px', 
-      borderRadius: '16px', 
+      borderRadius: 'var(--radius-lg)', 
       background: 'var(--bg-card)', 
-      border: '1px solid var(--border)', 
+      border: '1px solid var(--border-subtle)', 
       width: '100%',
       boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
     }}>
@@ -35,19 +35,16 @@ const TaskPanel = ({ session, onTaskSet }) => {
           <p style={{ fontSize: '14px', color: '#94A3B8' }}>What are we focusing on right now?</p>
           <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
             <input
+              className="input"
               style={{
                 flex: '1',
                 padding: '12px 14px',
                 borderRadius: '8px',
-                background: '#334155',
-                border: '1px solid #475569',
                 color: 'white',
                 outline: 'none',
                 fontSize: '14px',
                 transition: 'border-color 0.2s'
               }}
-              onFocus={(e) => e.target.style.borderColor = 'var(--primary)'}
-              onBlur={(e) => e.target.style.borderColor = '#475569'}
               placeholder="e.g. Write user research summary"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
@@ -56,14 +53,6 @@ const TaskPanel = ({ session, onTaskSet }) => {
             <button
               onClick={handleBreakDown}
               className="btn btn-primary"
-              style={{
-                padding: '0 20px',
-                borderRadius: '8px',
-                border: 'none',
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: '13px'
-              }}
             >
               Start
             </button>
@@ -88,9 +77,9 @@ const TaskPanel = ({ session, onTaskSet }) => {
                     gap: '12px',
                     padding: '14px 16px',
                     borderRadius: '10px',
-                    background: isCurrent ? 'rgba(255, 85, 0, 0.08)' : 'rgba(255,255,255,0.02)',
+                    background: isCurrent ? 'var(--accent-glow)' : 'rgba(255,255,255,0.02)',
                     border: '1px solid',
-                    borderColor: isCurrent ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
+                    borderColor: isCurrent ? 'var(--accent)' : 'rgba(255,255,255,0.05)',
                     borderLeftWidth: isCurrent ? '4px' : '1px',
                     opacity: step.done ? 0.5 : 1,
                     transition: 'all 0.3s ease'
@@ -123,17 +112,8 @@ const TaskPanel = ({ session, onTaskSet }) => {
 
           <button
             onClick={handleClearTask}
-            style={{
-              padding: '8px 12px',
-              background: 'transparent',
-              border: 'none',
-              color: '#64748B',
-              fontSize: '11px',
-              textDecoration: 'underline',
-              cursor: 'pointer',
-              alignSelf: 'center',
-              marginTop: '8px'
-            }}
+            className="btn btn-ghost btn-sm"
+            style={{ marginTop: '8px' }}
           >
             Clear and reset tasks
           </button>

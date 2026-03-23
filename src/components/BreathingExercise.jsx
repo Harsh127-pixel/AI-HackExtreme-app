@@ -60,11 +60,7 @@ export default function BreathingExercise({ onClose }) {
       <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
         <div style={{ fontSize: 14, color: theme.textMuted, marginBottom: 4 }}>Choose a breathing pattern</div>
         {Object.entries(PATTERNS).map(([key, p]) => (
-          <button key={key} onClick={() => start(key)} style={{
-            width: '100%', padding: '14px 18px', borderRadius: 12,
-            background: theme.bgCard, border: `1px solid ${theme.border}`,
-            color: theme.text, fontSize: 14, cursor: 'pointer', textAlign: 'left',
-          }}>
+          <button key={key} onClick={() => start(key)} className="card" style={{ cursor: 'pointer', textAlign: 'left', width: '100%' }}>
             <div style={{ fontWeight: 500 }}>{p.name}</div>
             <div style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>
               {p.steps.map((s, i) => `${s} (${p.durations[i]}s)`).join(' → ')}
@@ -99,10 +95,10 @@ export default function BreathingExercise({ onClose }) {
         <div style={{ fontSize: 36, color: theme.primary, fontWeight: 700, marginTop: 4 }}>{secondsLeft}</div>
       </div>
       <div style={{ display: 'flex', gap: 10 }}>
-        <button onClick={stop} style={{ padding: '10px 24px', borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.bgCard, color: theme.textMuted, fontSize: 14, cursor: 'pointer' }}>
+        <button onClick={stop} className="btn">
           Pause
         </button>
-        <button onClick={() => { stop(); setSelected(null) }} style={{ padding: '10px 24px', borderRadius: 10, border: 'none', background: theme.primary, color: 'white', fontSize: 14, cursor: 'pointer' }}>
+        <button onClick={() => { stop(); setSelected(null) }} className="btn btn-primary">
           Done
         </button>
       </div>

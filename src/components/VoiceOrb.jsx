@@ -64,7 +64,7 @@ const VoiceOrb = ({ voiceState, audioLevel = 0, mode = 'idle' }) => {
   };
 
   return (
-    <div style={{ padding: '40px 0', width: '100%', display: 'flex', justifyContent: 'center' }}>
+    <div style={{ padding: '20px 0', width: '100%', display: 'flex', justifyContent: 'center' }}>
       <style>
         {`
           @keyframes orb-pulse {

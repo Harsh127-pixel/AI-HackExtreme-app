@@ -22,12 +22,12 @@ export default function MoodCheckIn({ onComplete }) {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      height: '100dvh', background: '#0F172A', color: '#F1F5F9',
+      height: '100dvh', background: 'var(--bg-base)', color: '#F1F5F9',
       padding: 24, gap: 32, maxWidth: 480, margin: '0 auto',
     }}>
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: 40, marginBottom: 12 }}>🧠</div>
-        <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 8 }}>How are you feeling today?</h1>
+        <h1 style={{ fontSize: 24, letterSpacing: '-0.5px', fontWeight: 600, marginBottom: 8 }}>How are you feeling today?</h1>
         <p style={{ color: '#94A3B8', fontSize: 13, lineHeight: 1.6, maxWidth: 320, margin: '0 auto' }}>
           MindEase adapts to support you. Your answers never leave this device — no cloud, no servers, just you.
         </p>

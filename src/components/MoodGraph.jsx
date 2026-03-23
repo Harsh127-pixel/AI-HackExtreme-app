@@ -29,7 +29,7 @@ export default function MoodGraph() {
   const totalW = days.length * (barWidth + gap) - gap
 
   return (
-    <div style={{ padding: '16px', background: theme.bgCard, borderRadius: 16, border: `1px solid ${theme.border}` }}>
+    <div className="card">
       <div style={{ fontSize: 12, color: theme.textMuted, marginBottom: 12, fontWeight: 500, letterSpacing: 1, textTransform: 'uppercase' }}>
         Mood this week
       </div>

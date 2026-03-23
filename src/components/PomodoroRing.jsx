@@ -7,7 +7,7 @@ const PomodoroRing = ({ progress, formattedTime, phase, isRunning, pomodoroCount
   const color = phase === 'focus' ? '#FF5500' : '#14B8A6';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', padding: '24px 0' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', padding: '8px 0 0' }}>
       <div style={{ position: 'relative', width: '200px', height: '200px' }}>
         <svg width="200" height="200" viewBox="0 0 200 200" style={{ transform: 'rotate(-90deg)' }}>
           {/* Background circle */}
@@ -15,7 +15,7 @@ const PomodoroRing = ({ progress, formattedTime, phase, isRunning, pomodoroCount
             cx="100"
             cy="100"
             r={radius}
-            stroke="#334155"
+            stroke="var(--border-default)"
             strokeWidth="8"
             fill="transparent"
           />

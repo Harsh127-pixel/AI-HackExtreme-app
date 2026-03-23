@@ -10,16 +10,18 @@ export default function AmbientSounds({ theme }) {
   }
 
   return (
-    <div style={{ background: theme.bgCard, borderRadius: 16, padding: 16, border: `1px solid ${theme.border}` }}>
+    <div className="card">
       <div style={{ fontSize: 12, color: theme.textMuted, fontWeight: 500, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12 }}>
         Ambient sounds
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         {Object.entries(SOUNDS).map(([id, sound]) => (
           <button key={id} onClick={() => toggle(id)} style={{
-            padding: '12px 10px', borderRadius: 12, border: 'none', cursor: 'pointer',
-            background: active === id ? theme.primary + '33' : theme.bgInput,
-            outline: active === id ? `2px solid ${theme.primary}` : '2px solid transparent',
+            padding: '12px 10px',
+            background: active === id ? theme.primary + '18' : 'var(--bg-input)',
+            border: active === id ? `1.5px solid ${theme.primary}` : '1.5px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-md)',
+            cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 8,
             transition: 'all 0.15s',
           }}>
@@ -37,11 +39,7 @@ export default function AmbientSounds({ theme }) {
         </p>
       )}
       {active && (
-        <button onClick={() => { stopSound(); setActive(null) }} style={{
-          marginTop: 10, width: '100%', padding: '8px 0', borderRadius: 10,
-          border: `1px solid ${theme.border}`, background: 'transparent',
-          color: theme.textMuted, fontSize: 13, cursor: 'pointer',
-        }}>
+        <button className="btn btn-ghost btn-sm" style={{ width: '100%', marginTop: 8 }} onClick={() => { stopSound(); setActive(null) }}>
           Stop sound
         </button>
       )}

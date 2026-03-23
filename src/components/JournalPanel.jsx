@@ -24,18 +24,13 @@ const JournalPanel = () => {
   };
 
   return (
-    <div style={{ 
-      padding: '24px', 
-      borderRadius: '16px', 
-      background: 'var(--bg-card)', 
-      border: '1px solid var(--border)', 
+    <div className="card" style={{ 
       width: '100%',
       display: 'flex', 
       flexDirection: 'column',
-      maxHeight: '400px',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+      maxHeight: '400px'
     }}>
-      <h2 style={{ fontSize: '18px', color: 'white', fontWeight: '700', marginBottom: '20px' }}>Session Journal</h2>
+      <h2 style={{ fontSize: '18px', color: 'var(--text-primary)', fontWeight: '700', marginBottom: '20px' }}>Session Journal</h2>
 
       <div style={{ flex: '1', overflowY: 'auto', paddingRight: '4px' }} className="custom-scroll">
         {last7Days.length === 0 ? (
@@ -83,16 +78,9 @@ const JournalPanel = () => {
       {last7Days.length > 0 && (
         <button
           onClick={clearEntries}
+          className="btn btn-ghost btn-sm"
           style={{ 
             marginTop: '20px',
-            padding: '8px', 
-            background: 'transparent', 
-            border: 'none', 
-            color: '#475569', 
-            fontSize: '11px', 
-            cursor: 'pointer',
-            textAlign: 'center',
-            textDecoration: 'underline',
             alignSelf: 'center'
           }}
         >

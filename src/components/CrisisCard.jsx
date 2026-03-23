@@ -7,10 +7,11 @@ export default function CrisisCard({ onDismiss }) {
   return (
     <div style={{
       margin: '0 16px',
+      background: 'rgba(139,92,246,0.08)',
+      border: '1px solid rgba(139,92,246,0.25)',
+      borderRadius: 'var(--radius-lg)',
+      animation: 'slideUp 0.3s both',
       padding: '16px 18px',
-      background: '#1E1B2E',
-      border: '1px solid #8B5CF6',
-      borderRadius: 12,
       display: 'flex',
       flexDirection: 'column',
       gap: 10,

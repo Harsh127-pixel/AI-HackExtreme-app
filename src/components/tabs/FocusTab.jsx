@@ -166,90 +166,183 @@ export default function FocusTab({ theme, onCrisis }) {
   ].filter(l => l.loader.state !== 'ready')
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '20px 0 20px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, paddingBottom: 32 }}>
 
-      {/* Model banner */}
+      {/* Model download banner */}
       {pendingLoaders.length > 0 && voiceState === 'idle' && (
-        <div style={{ margin: '0 16px', padding: '10px 14px', background: theme.bgCard, borderRadius: 12, border: `1px solid ${theme.border}`, fontSize: 13, color: theme.textMuted, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span>Models needed: {pendingLoaders.map(l => l.label).join(', ')}</span>
-          <button onClick={ensureModels} style={{ padding: '4px 12px', borderRadius: 8, border: 'none', background: theme.primary, color: 'white', fontSize: 12, cursor: 'pointer' }}>
+        <div style={{
+          margin: '16px 16px 0',
+          padding: '12px 16px',
+          background: 'var(--warning-bg)',
+          border: '1px solid rgba(251,191,36,0.2)',
+          borderRadius: 'var(--radius-md)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          animation: 'slideUp 0.3s both',
+        }}>
+          <div>
+            <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--warning)' }}>
+              AI models needed
+            </p>
+            <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+              {pendingLoaders.map(l => l.label).join(', ')}
+            </p>
+          </div>
+          <button onClick={ensureModels} className="btn btn-sm" style={{
+            background: 'var(--warning)', color: '#000', border: 'none', fontWeight: 600,
+          }}>
             Download
           </button>
         </div>
       )}
 
-      {/* Mode buttons */}
-      <div style={{ display: 'flex', gap: 8, padding: '0 16px' }}>
-        {[{ label: '🎯 Focus', mode: 'focus' }, { label: '☕ Break', mode: 'break' }].map(({ label, mode }) => (
-          <button key={mode} onClick={() => { session.mode = mode; notify(); if (mode === 'focus' && !pomodoro.isRunning) pomodoro.start() }} style={{
-            flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 500,
-            background: currentSession.mode === mode ? theme.primary : theme.bgCard,
-            color: currentSession.mode === mode ? 'white' : theme.textMuted,
-          }}>
-            {label}
-          </button>
-        ))}
-        <button onClick={() => { pomodoro.reset(); session.mode = 'idle'; notify() }} style={{ padding: '10px 14px', borderRadius: 10, border: `1px solid ${theme.border}`, background: 'transparent', color: theme.textMuted, fontSize: 13, cursor: 'pointer' }}>
+      {/* Mode selector */}
+      <div style={{ padding: '16px 16px 0', display: 'flex', gap: 8 }}>
+        {[
+          { label: '🎯 Focus', mode: 'focus' },
+          { label: '☕ Break', mode: 'break' },
+        ].map(({ label, mode }) => {
+          const active = currentSession.mode === mode
+          return (
+            <button key={mode} onClick={() => {
+              session.mode = mode; notify()
+              if (mode === 'focus' && !pomodoro.isRunning) pomodoro.start()
+            }} style={{
+              flex: 1, padding: '10px 0',
+              borderRadius: 'var(--radius-md)',
+              border: `1.5px solid ${active ? theme.primary : 'var(--border-default)'}`,
+              background: active ? theme.primary + '18' : 'var(--bg-card)',
+              color: active ? theme.primary : 'var(--text-secondary)',
+              fontSize: 14, fontWeight: active ? 600 : 400,
+              cursor: 'pointer', transition: 'all var(--transition-fast)',
+            }}>
+              {label}
+            </button>
+          )
+        })}
+        <button onClick={() => { pomodoro.reset(); session.mode = 'idle'; notify() }}
+          className="btn btn-ghost btn-icon" style={{ fontSize: 18, flexShrink: 0 }}
+          title="Reset">
           ↺
         </button>
       </div>
 
-      {/* Pomodoro */}
+      {/* Pomodoro ring */}
       {currentSession.mode !== 'idle' && (
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <PomodoroRing progress={pomodoro.progress} formattedTime={pomodoro.formattedTime} phase={pomodoro.phase} isRunning={pomodoro.isRunning} pomodoroCount={currentSession.pomodoroCount} />
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 0' }}>
+          <PomodoroRing
+            progress={pomodoro.progress}
+            formattedTime={pomodoro.formattedTime}
+            phase={pomodoro.phase}
+            isRunning={pomodoro.isRunning}
+            pomodoroCount={currentSession.pomodoroCount}
+          />
         </div>
       )}
 
-      {/* Voice orb */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-        <VoiceOrb voiceState={voiceState} audioLevel={audioLevel} mode={currentSession.mode} />
-        <p style={{ fontSize: 13, color: theme.textMuted, margin: 0 }}>
-          {voiceState === 'idle' && 'Tap to speak'}
-          {voiceState === 'listening' && 'Listening...'}
-          {voiceState === 'processing' && 'Processing...'}
-          {voiceState === 'speaking' && 'Speaking...'}
+      {/* Voice orb area */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+        padding: currentSession.mode === 'idle' ? '32px 16px 16px' : '8px 16px 16px',
+      }}>
+        <div style={{ position: 'relative' }}>
+          <VoiceOrb voiceState={voiceState} audioLevel={audioLevel} mode={currentSession.mode} />
+          {voiceState === 'listening' && (
+            <div style={{
+              position: 'absolute', inset: -8, borderRadius: '50%',
+              border: `2px solid ${theme.primary}40`,
+              animation: 'orbPulse 2s ease-in-out infinite',
+            }} />
+          )}
+        </div>
+
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
+          {voiceState === 'idle' && 'Tap to speak with MindEase'}
+          {voiceState === 'listening' && '🎙️ Listening — speak now'}
+          {voiceState === 'processing' && '⚙️ Processing your message...'}
+          {voiceState === 'speaking' && '🔊 MindEase is responding'}
         </p>
-        {voiceState === 'idle' ? (
-          <button onClick={startListening} style={{ padding: '10px 28px', borderRadius: 8, border: 'none', background: theme.primary, color: 'white', fontSize: 14, cursor: 'pointer' }}>
+
+        {voiceState === 'idle' && (
+          <button onClick={startListening} className="btn btn-primary btn-lg" style={{
+            background: theme.primary,
+            boxShadow: `0 4px 16px ${theme.glow}`,
+            border: 'none',
+          }}>
             Start Listening
           </button>
-        ) : voiceState === 'listening' ? (
-          <button onClick={stopListening} style={{ padding: '10px 28px', borderRadius: 8, border: `1px solid ${theme.border}`, background: theme.bgCard, color: theme.text, fontSize: 14, cursor: 'pointer' }}>
+        )}
+        {voiceState === 'listening' && (
+          <button onClick={stopListening} className="btn btn-lg">
             Stop
           </button>
-        ) : null}
+        )}
       </div>
 
       {/* Celebration toast */}
       {celebrating && (
         <div style={{
           margin: '0 16px',
-          padding: '12px 16px',
-          background: theme.gradient,
-          border: `1px solid ${theme.primary}`,
-          borderRadius: 12,
-          display: 'flex', alignItems: 'center', gap: 10,
-          animation: 'fadeIn 0.3s ease',
+          padding: '14px 16px',
+          background: `linear-gradient(135deg, ${theme.primary}18, ${theme.accent}10)`,
+          border: `1px solid ${theme.primary}30`,
+          borderRadius: 'var(--radius-lg)',
+          display: 'flex', alignItems: 'center', gap: 12,
+          animation: 'slideUp 0.4s cubic-bezier(0.175,0.885,0.32,1.275) both',
         }}>
-          <span style={{ fontSize: 24 }}>🎉</span>
-          <span style={{ color: theme.text, fontSize: 14 }}>{celebrationMsg}</span>
+          <span style={{ fontSize: 28 }}>🎉</span>
+          <div>
+            <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{celebrationMsg}</p>
+            <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+              {currentSession.pomodoroCount * 25} focus minutes today
+            </p>
+          </div>
         </div>
       )}
 
       {/* Session summary */}
-      <SessionSummaryCard theme={theme} prevPomodoroCount={prevPomodoroCount} />
+      <div style={{ padding: '0 16px' }}>
+        <SessionSummaryCard theme={theme} prevPomodoroCount={prevPomodoroCount} />
+      </div>
 
       {/* Task panel */}
-      <TaskPanel session={currentSession} onTaskSet={(text) => { if (text) { setTask(text); session.mode = 'focus'; notify(); pomodoro.start() } }} />
+      <div style={{ padding: '8px 16px 0' }}>
+        <TaskPanel session={currentSession} onTaskSet={(text) => {
+          if (text) { setTask(text); session.mode = 'focus'; notify(); pomodoro.start() }
+        }} />
+      </div>
 
-      {/* Last exchange */}
+      {/* Conversation */}
       {(transcript || response) && (
-        <div style={{ margin: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {transcript && <div style={{ padding: '10px 14px', background: theme.primary, borderRadius: '12px 12px 4px 12px', fontSize: 14, color: 'white', alignSelf: 'flex-end', maxWidth: '85%' }}>{transcript}</div>}
-          {response && <div style={{ padding: '10px 14px', background: theme.bgCard, borderRadius: '12px 12px 12px 4px', fontSize: 14, color: theme.text, alignSelf: 'flex-start', maxWidth: '85%', lineHeight: 1.5 }}>{response}</div>}
+        <div style={{ padding: '12px 16px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {transcript && (
+            <div style={{ alignSelf: 'flex-end', maxWidth: '80%' }}>
+              <div style={{
+                padding: '10px 14px',
+                background: theme.primary,
+                borderRadius: '16px 16px 4px 16px',
+                fontSize: 14, color: '#fff', lineHeight: 1.5,
+                boxShadow: `0 2px 8px ${theme.glow}`,
+              }}>
+                {transcript}
+              </div>
+            </div>
+          )}
+          {response && (
+            <div style={{ alignSelf: 'flex-start', maxWidth: '85%' }}>
+              <div style={{
+                padding: '10px 14px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-default)',
+                borderRadius: '16px 16px 16px 4px',
+                fontSize: 14, color: 'var(--text-primary)', lineHeight: 1.6,
+              }}>
+                {response}
+              </div>
+            </div>
+          )}
         </div>
       )}
+
     </div>
   )
 }

@@ -24,7 +24,7 @@ export default function ProgressInsights({ theme }) {
   }, [])
 
   const StatCard = ({ emoji, value, label, color }) => (
-    <div style={{ flex: 1, background: theme.bgCard, borderRadius: 14, padding: '14px 10px', border: `1px solid ${theme.border}`, textAlign: 'center', minWidth: 0 }}>
+    <div className="card" style={{ textAlign: 'center', padding: '14px 10px', flex: 1, minWidth: 0 }}>
       <div style={{ fontSize: 22 }}>{emoji}</div>
       <div style={{ fontSize: 22, fontWeight: 700, color: color || theme.text, marginTop: 4 }}>{value}</div>
       <div style={{ fontSize: 10, color: theme.textMuted, marginTop: 2, lineHeight: 1.3 }}>{label}</div>
@@ -36,7 +36,7 @@ export default function ProgressInsights({ theme }) {
 
       {/* Top mood */}
       {stats.topMood && (
-        <div style={{ padding: '14px 16px', background: theme.bgCard, borderRadius: 14, border: `1px solid ${theme.border}` }}>
+        <div className="card">
           <div style={{ fontSize: 12, color: theme.textMuted, marginBottom: 6, fontWeight: 500, textTransform: 'uppercase', letterSpacing: 0.5 }}>Most common mood this week</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 12, height: 12, borderRadius: '50%', background: MOOD_COLORS[stats.topMood[0]] }} />
@@ -57,7 +57,7 @@ export default function ProgressInsights({ theme }) {
       </div>
 
       {/* Encouragement */}
-      <div style={{ padding: '12px 14px', background: theme.gradient, borderRadius: 12, border: `1px solid ${theme.border}` }}>
+      <div style={{ padding: '12px 14px', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)' }}>
         <p style={{ fontSize: 13, color: theme.text, lineHeight: 1.6, margin: 0 }}>
           {stats.journalCount >= 3
             ? "You've been consistently showing up for yourself this week. That takes real commitment."
