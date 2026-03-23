@@ -1,28 +1,29 @@
 import { useState } from 'react'
-
-const STEPS = [
-  {
-    emoji: '👋',
-    title: 'Welcome to MindEase',
-    description: 'Your private, on-device AI focus coach and mental wellness companion.',
-    cta: 'Next'
-  },
-  {
-    emoji: '🔒',
-    title: '100% Private',
-    description: 'Everything stays on your device. We use local AI models so your journal and thoughts never touch the cloud.',
-    cta: 'Next'
-  },
-  {
-    emoji: '🧘',
-    title: 'Ready to start?',
-    description: 'Track your mood, get AI CBT reframing, and manage deep focus sessions gracefully.',
-    cta: 'Get Started'
-  }
-]
+import { t } from '../mindease/i18n.js'
 
 export default function Onboarding({ onComplete }) {
   const [step, setStep] = useState(0)
+
+  const STEPS = [
+    {
+      emoji: '👋',
+      title: t('onboarding_title_1'),
+      description: t('onboarding_desc_1'),
+      cta: t('onboarding_next')
+    },
+    {
+      emoji: '🔒',
+      title: t('onboarding_title_2'),
+      description: t('onboarding_desc_2'),
+      cta: t('onboarding_next')
+    },
+    {
+      emoji: '🧘',
+      title: t('onboarding_title_3'),
+      description: t('onboarding_desc_3'),
+      cta: t('onboarding_get_started')
+    }
+  ]
 
   const handleNext = () => {
     if (step < STEPS.length - 1) {
@@ -78,7 +79,7 @@ export default function Onboarding({ onComplete }) {
           className="btn btn-ghost btn-sm" 
           style={{ marginTop: 8 }}
         >
-          Skip
+          {t('onboarding_skip')}
         </button>
       </div>
     </div>

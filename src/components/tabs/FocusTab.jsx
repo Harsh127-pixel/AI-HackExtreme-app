@@ -6,6 +6,7 @@ import VoiceOrb from '../VoiceOrb.jsx'
 import PomodoroRing from '../PomodoroRing.jsx'
 import TaskPanel from '../TaskPanel.jsx'
 import SessionSummaryCard from '../SessionSummaryCard.jsx'
+import { t } from '../../mindease/i18n.js'
 import {
   VoicePipeline, ModelCategory, ModelManager,
   AudioCapture, AudioPlayback, SpeechActivity, EventBus
@@ -187,10 +188,20 @@ export default function FocusTab({ theme, onCrisis }) {
               {pendingLoaders.map(l => l.label).join(', ')}
             </p>
           </div>
-          <button onClick={ensureModels} className="btn btn-sm" style={{
-            background: 'var(--warning)', color: '#000', border: 'none', fontWeight: 600,
-          }}>
-            Download
+          <button 
+            onClick={ensureModels} 
+            disabled={pendingLoaders.some(l => l.loader.state === 'downloading' || l.loader.state === 'loading')}
+            className="btn btn-sm" 
+            style={{
+              background: pendingLoaders.some(l => l.loader.state === 'downloading' || l.loader.state === 'loading') ? 'var(--warning-dark)' : 'var(--warning)', 
+              color: '#000', border: 'none', fontWeight: 600,
+              opacity: pendingLoaders.some(l => l.loader.state === 'downloading' || l.loader.state === 'loading') ? 0.7 : 1,
+              cursor: pendingLoaders.some(l => l.loader.state === 'downloading' || l.loader.state === 'loading') ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {pendingLoaders.some(l => l.loader.state === 'downloading') ? 'Downloading...' :
+             pendingLoaders.some(l => l.loader.state === 'loading') ? 'Loading...' :
+             'Download'}
           </button>
         </div>
       )}
@@ -198,8 +209,8 @@ export default function FocusTab({ theme, onCrisis }) {
       {/* Mode selector */}
       <div style={{ padding: '16px 16px 0', display: 'flex', gap: 8 }}>
         {[
-          { label: '🎯 Focus', mode: 'focus' },
-          { label: '☕ Break', mode: 'break' },
+          { label: t('start_focus'), mode: 'focus' },
+          { label: t('take_break'), mode: 'break' },
         ].map(({ label, mode }) => {
           const active = currentSession.mode === mode
           return (
@@ -268,12 +279,12 @@ export default function FocusTab({ theme, onCrisis }) {
             boxShadow: `0 4px 16px ${theme.glow}`,
             border: 'none',
           }}>
-            Start Listening
+            {t('start_listening')}
           </button>
         )}
         {voiceState === 'listening' && (
           <button onClick={stopListening} className="btn btn-lg">
-            Stop
+            {t('stop')}
           </button>
         )}
       </div>

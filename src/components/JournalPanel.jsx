@@ -1,5 +1,6 @@
 import React from 'react';
 import useJournal from '../focuscoach/useJournal.js';
+import { t } from '../mindease/i18n.js';
 
 const JournalPanel = () => {
   const { last7Days, clearEntries } = useJournal();
@@ -16,7 +17,7 @@ const JournalPanel = () => {
     try {
       const date = new Date(isoString);
       const now = new Date();
-      if (date.toDateString() === now.toDateString()) return 'Today';
+      if (date.toDateString() === now.toDateString()) return t('today');
       return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
     } catch(e) {
       return '';
@@ -30,7 +31,7 @@ const JournalPanel = () => {
       flexDirection: 'column',
       maxHeight: '400px'
     }}>
-      <h2 style={{ fontSize: '18px', color: 'var(--text-primary)', fontWeight: '700', marginBottom: '20px' }}>Session Journal</h2>
+      <h2 style={{ fontSize: '18px', color: 'var(--text-primary)', fontWeight: '700', marginBottom: '20px' }}>{t('session_journal')}</h2>
 
       <div style={{ flex: '1', overflowY: 'auto', paddingRight: '4px' }} className="custom-scroll">
         {last7Days.length === 0 ? (
@@ -42,7 +43,7 @@ const JournalPanel = () => {
             fontStyle: 'italic',
             lineHeight: '1.5'
           }}>
-            No entries yet. Complete a session to see your reflections.
+            {t('no_entries')}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0px' }}>
@@ -84,7 +85,7 @@ const JournalPanel = () => {
             alignSelf: 'center'
           }}
         >
-          Clear all entries
+          {t('clear_all')}
         </button>
       )}
     </div>

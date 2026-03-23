@@ -41,158 +41,175 @@ export default function HomeTab({ theme }) {
   const handleSleep = (id) => { setSleepSelected(id); setSleepQuality(id) }
 
   const hour = new Date().getHours()
-  const greeting = hour < 12 ? t('greeting_morning') : hour < 17 ? t('greeting_afternoon') : t('greeting_evening')
+  let greeting = t('greeting_night')
+  if (hour >= 5 && hour < 12) greeting = t('greeting_morning')
+  else if (hour >= 12 && hour < 17) greeting = t('greeting_afternoon')
+  else if (hour >= 17 && hour < 22) greeting = t('greeting_evening')
   const moodMsg = () => {
     const opts = MOOD_MESSAGES[currentSession.wellnessMode] || MOOD_MESSAGES.okay
     return opts[new Date().getDay() % opts.length]
   }
 
   return (
-    <div style={{ padding: '20px 16px 32px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ padding: '24px 16px 40px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <style>{`
+        .dashboard-grid { 
+          display: grid; 
+          grid-template-columns: 1fr; 
+          gap: 20px; 
+        }
+        @media (min-width: 1024px) {
+          .dashboard-grid { 
+            grid-template-columns: repeat(2, 1fr); 
+            gap: 24px; 
+          }
+          .full-width { grid-column: 1 / -1; }
+        }
+      `}</style>
 
       {/* Greeting */}
-      <div style={{ marginBottom: 4 }}>
-        <h2 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
+      <div style={{ marginBottom: 8 }} className="full-width">
+        <h2 style={{ fontSize: 32, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-1px' }}>
           {greeting} 👋
         </h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginTop: 6, lineHeight: 1.6 }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 16, marginTop: 8, lineHeight: 1.6, maxWidth: 600 }}>
           {moodMsg()}
         </p>
       </div>
 
-      {/* Streak + Quick stats row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-        <div style={{
-          gridColumn: '1 / 3',
-          background: `linear-gradient(135deg, ${theme.primary}18, ${theme.accent}10)`,
-          border: `1px solid ${theme.primary}25`,
-          borderRadius: 'var(--radius-lg)', padding: '14px 16px',
-          display: 'flex', alignItems: 'center', gap: 12,
-        }}>
+      <div className="dashboard-grid">
+
+        {/* Streak + Quick stats row */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 16 }}>
           <div style={{
-            width: 44, height: 44, borderRadius: 14,
-            background: theme.primary + '22',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 22, flexShrink: 0,
-          }}>🔥</div>
-          <div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>
-              {streak}
+            background: `linear-gradient(135deg, ${theme.primary}18, ${theme.accent}10)`,
+            border: `1.5px solid ${theme.primary}30`,
+            borderRadius: 24, padding: '20px 24px',
+            display: 'flex', alignItems: 'center', gap: 16,
+          }}>
+            <div style={{
+              width: 52, height: 52, borderRadius: 16,
+              background: theme.primary + '22',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 26, flexShrink: 0,
+            }}>🔥</div>
+            <div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>
+                {streak}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
+                {t('streak_days')}
+              </div>
             </div>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
-              day{streak !== 1 ? 's' : ''} streak
+          </div>
+
+          <div style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 24, padding: '20px',
+            textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center'
+          }}>
+            <div style={{ fontSize: 24 }}>🍅</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', marginTop: 6 }}>
+              {currentSession.pomodoroCount}
             </div>
-          </div>
-          <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: theme.primary }}>{longestStreak}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>best</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Sessions</div>
           </div>
         </div>
 
-        <div style={{
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--radius-lg)', padding: '14px 12px',
-          textAlign: 'center',
-        }}>
-          <div style={{ fontSize: 20 }}>🍅</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginTop: 4 }}>
-            {currentSession.pomodoroCount}
+        {/* Mood selector */}
+        <div className="card" style={{ borderRadius: 24, padding: 24 }}>
+          <p className="section-label" style={{ marginBottom: 16, fontSize: 15 }}>{t('mood_today')}</p>
+          <div style={{ display: 'flex', gap: 10 }}>
+            {MOODS.map(m => {
+              const active = moodSelected === m.id
+              return (
+                <button key={m.id} onClick={() => handleMood(m.id)} style={{
+                  flex: 1, padding: '14px 6px', borderRadius: 18,
+                  border: `2px solid ${active ? m.color : 'transparent'}`,
+                  background: active ? m.color + '18' : 'var(--bg-input)',
+                  cursor: 'pointer', transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+                  transform: active ? 'scale(1.05)' : 'scale(1)',
+                }}>
+                  <span style={{ fontSize: 24 }}>{m.emoji}</span>
+                  <span style={{ fontSize: 11, color: active ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: active ? 700 : 500 }}>
+                    {m.label}
+                  </span>
+                </button>
+              )
+            })}
           </div>
-          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>sessions</div>
         </div>
-      </div>
 
-      {/* Mood selector */}
-      <div className="card">
-        <p className="section-label" style={{ marginBottom: 12 }}>{t('mood_today')}</p>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {MOODS.map(m => {
-            const active = moodSelected === m.id
-            return (
-              <button key={m.id} onClick={() => handleMood(m.id)} style={{
-                flex: 1, padding: '10px 4px', borderRadius: 'var(--radius-md)',
-                border: `1.5px solid ${active ? m.color : 'var(--border-subtle)'}`,
-                background: active ? m.color + '18' : 'var(--bg-input)',
-                cursor: 'pointer', transition: 'all var(--transition-fast)',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
-                transform: active ? 'scale(1.04)' : 'scale(1)',
-              }}>
-                <span style={{ fontSize: 22 }}>{m.emoji}</span>
-                <span style={{ fontSize: 10, color: active ? m.color : 'var(--text-muted)', fontWeight: active ? 600 : 400 }}>
-                  {m.label}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Sleep check-in */}
-      <div className="card">
-        <p className="section-label" style={{ marginBottom: 12 }}>{t('sleep_quality')}</p>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {SLEEP.map(s => {
-            const active = sleepSelected === s.id
-            return (
-              <button key={s.id} onClick={() => handleSleep(s.id)} style={{
-                flex: 1, padding: '10px 4px', borderRadius: 'var(--radius-md)',
-                border: `1.5px solid ${active ? theme.primary : 'var(--border-subtle)'}`,
-                background: active ? theme.primary + '18' : 'var(--bg-input)',
-                cursor: 'pointer', transition: 'all var(--transition-fast)',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
-                transform: active ? 'scale(1.04)' : 'scale(1)',
-              }}>
-                <span style={{ fontSize: 20 }}>{s.emoji}</span>
-                <span style={{ fontSize: 10, color: active ? theme.primary : 'var(--text-muted)', fontWeight: active ? 600 : 400 }}>
-                  {s.label}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Mood graph */}
-      <MoodGraph />
-
-      {/* This week insights */}
-      <div className="card">
-        <p className="section-label" style={{ marginBottom: 14 }}>📊 {t('this_week')}</p>
-        <ProgressInsights theme={theme} />
-      </div>
-
-      {/* Stats row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-        {[
-          { emoji: '📓', value: currentSession.journalEntries.length, label: 'journals' },
-          { emoji: '🙏', value: currentSession.gratitudeEntries.length, label: 'gratitude' },
-          { emoji: '🔄', value: currentSession.reframingHistory.length, label: 'reframes' },
-        ].map(s => (
-          <div key={s.label} className="card" style={{ textAlign: 'center', padding: '14px 8px' }}>
-            <div style={{ fontSize: 20 }}>{s.emoji}</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginTop: 4 }}>{s.value}</div>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>{s.label}</div>
+        {/* Sleep check-in */}
+        <div className="card" style={{ borderRadius: 24, padding: 24 }}>
+          <p className="section-label" style={{ marginBottom: 16, fontSize: 15 }}>{t('sleep_quality')}</p>
+          <div style={{ display: 'flex', gap: 10 }}>
+            {SLEEP.map(s => {
+              const active = sleepSelected === s.id
+              return (
+                <button key={s.id} onClick={() => handleSleep(s.id)} style={{
+                  flex: 1, padding: '14px 6px', borderRadius: 18,
+                  border: `2px solid ${active ? theme.primary : 'transparent'}`,
+                  background: active ? theme.primary + '18' : 'var(--bg-input)',
+                  cursor: 'pointer', transition: 'all 0.2s',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+                  transform: active ? 'scale(1.05)' : 'scale(1)',
+                }}>
+                  <span style={{ fontSize: 24 }}>{s.emoji}</span>
+                  <span style={{ fontSize: 11, color: active ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: 700 }}>
+                    {s.label}
+                  </span>
+                </button>
+              )
+            })}
           </div>
-        ))}
-      </div>
-
-      {/* Data management */}
-      <div className="card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: showData ? 14 : 0 }}>
-          <div>
-            <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>Your data</p>
-            <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
-              Stored on this device only
-            </p>
-          </div>
-          <button className="btn btn-ghost btn-sm" onClick={() => setShowData(v => !v)}>
-            {showData ? 'Hide ▲' : 'Manage ▼'}
-          </button>
         </div>
-        {showData && <ExportData theme={theme} />}
-      </div>
 
+        {/* This week insights - Moves to another column on desktop if possible */}
+        <div className="card" style={{ borderRadius: 24, padding: 24 }}>
+          <p className="section-label" style={{ marginBottom: 18, fontSize: 15 }}>📊 {t('this_week')}</p>
+          <ProgressInsights theme={theme} />
+        </div>
+
+        {/* Mood graph - Full width */}
+        <div className="full-width">
+          <MoodGraph />
+        </div>
+
+        {/* Stats row */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }} className="full-width">
+          {[
+            { emoji: '📓', value: currentSession.journalEntries.length, label: 'Journals' },
+            { emoji: '🙏', value: currentSession.gratitudeEntries.length, label: 'Gratitude' },
+            { emoji: '🔄', value: currentSession.reframingHistory.length, label: 'Reframes' },
+          ].map(s => (
+            <div key={s.label} className="card" style={{ textAlign: 'center', padding: '20px 12px', borderRadius: 24 }}>
+              <div style={{ fontSize: 28 }}>{s.emoji}</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)', marginTop: 8 }}>{s.value}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2, fontWeight: 500 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Data management icon */}
+        <div className="card full-width" style={{ borderRadius: 24, padding: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: showData ? 20 : 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>⚙️</div>
+              <div>
+                <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Privacy & Data</p>
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4, margin: 0 }}>All data stays locally on your device.</p>
+              </div>
+            </div>
+            <button className="btn btn-ghost" onClick={() => setShowData(v => !v)} style={{ padding: '8px 16px', borderRadius: 10 }}>
+              {showData ? 'Hide Settings' : 'Manage Data'}
+            </button>
+          </div>
+          {showData && <ExportData theme={theme} />}
+        </div>
+      </div>
     </div>
   )
 }

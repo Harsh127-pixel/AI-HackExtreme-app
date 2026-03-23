@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getTheme } from '../mindease/theme.js'
 import { session, notify, toggleSOS } from '../focuscoach/sessionState.js'
+import { t } from '../mindease/i18n.js'
 
 export default function SOSMode({ onClose }) {
   const theme = getTheme('stress') // Fixed stress theme for SOS
@@ -24,8 +25,8 @@ export default function SOSMode({ onClose }) {
       padding: 24, alignItems: 'center', justifyContent: 'center', gap: 32,
     }}>
       <div style={{ textAlign: 'center' }}>
-        <h1 style={{ color: theme.primary, fontSize: 28, fontWeight: 700, marginBottom: 8 }}>I'm here with you.</h1>
-        <p style={{ color: theme.textMuted, fontSize: 16 }}>You are safe. We'll get through this together.</p>
+        <h1 style={{ color: theme.primary, fontSize: 28, fontWeight: 700, marginBottom: 8 }}>{t('sos_presence')}</h1>
+        <p style={{ color: theme.textMuted, fontSize: 16 }}>{t('sos_safety')}</p>
       </div>
 
       <div style={{
@@ -34,7 +35,7 @@ export default function SOSMode({ onClose }) {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         animation: 'pulse 4s infinite ease-in-out'
       }}>
-        <div style={{ color: theme.text, fontSize: 20, fontWeight: 600 }}>Breathe 🌬️</div>
+        <div style={{ color: theme.text, fontSize: 20, fontWeight: 600 }}>{t('breathe')} 🌬️</div>
       </div>
 
       <div style={{ width: '100%', maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -42,18 +43,18 @@ export default function SOSMode({ onClose }) {
           onClick={() => { session.mode = 'sos'; notify(); }}
           style={{ width: '100%', padding: '20px', borderRadius: 16, background: theme.primary, border: 'none', color: 'white', fontSize: 18, fontWeight: 700, cursor: 'pointer' }}
         >
-          Tap to use Voice Help
+          {t('sos_voice_help')}
         </button>
         
         <a href="tel:9152987821" style={{ 
           width: '100%', padding: '16px', borderRadius: 16, background: theme.bgCard, border: `2px solid ${theme.border}`,
           color: theme.text, textDecoration: 'none', textAlign: 'center', fontSize: 16, fontWeight: 600
         }}>
-          Call iCall Helpline (India)
+          {t('sos_call_helpline')}
         </a>
 
         <button onClick={onClose} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: 14, cursor: 'pointer', marginTop: 12 }}>
-          Close SOS Mode
+          {t('sos_close')}
         </button>
       </div>
 

@@ -19,6 +19,9 @@ export const session = {
   affirmations: [],          // array of strings, AI-generated
   weeklyReflection: null,    // string, AI-generated weekly summary
   sosActive: false,          // whether SOS mode is active
+  pomodoroRunning: false,
+  pomodoroSecondsLeft: 25 * 60,
+  pomodoroDuration: 25 * 60,
 }
 
 // Load persistence on init
@@ -170,3 +173,9 @@ export function toggleSOS(active) {
   session.sosActive = active
   notify()
 }
+
+export function setPomodoroState(state) {
+  Object.assign(session, state)
+  notify()
+}
+

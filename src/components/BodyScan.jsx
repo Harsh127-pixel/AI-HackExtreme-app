@@ -1,23 +1,21 @@
-import { useState, useEffect, useRef } from 'react'
-
-const STEPS = [
-  { zone: 'Feet & toes', instruction: "Bring your attention to your feet. Notice any tension, warmth, or tingling. Let them completely relax.", duration: 20 },
-  { zone: 'Calves & shins', instruction: "Move your awareness up to your calves and shins. Notice how they feel against whatever surface they're resting on.", duration: 20 },
-  { zone: 'Knees & thighs', instruction: "Gently notice your knees and thighs. Let any tightness soften and release.", duration: 20 },
-  { zone: 'Hips & lower back', instruction: "Notice your hips and lower back. This is where many of us hold stress. Breathe into this area.", duration: 25 },
-  { zone: 'Belly', instruction: "Feel your belly rise and fall with each breath. Let it be soft. You don't need to hold anything in.", duration: 20 },
-  { zone: 'Chest & heart', instruction: "Place your awareness on your chest. Notice your heartbeat. Thank your body for carrying you today.", duration: 25 },
-  { zone: 'Shoulders', instruction: "Let your shoulders drop. Notice if they've crept up toward your ears. Allow them to fall.", duration: 20 },
-  { zone: 'Arms & hands', instruction: "Feel the weight of your arms. Notice your hands — the palms, the fingers. Let them be completely still.", duration: 20 },
-  { zone: 'Neck & throat', instruction: "Soften your neck and throat. These areas often hold unexpressed emotions. Just notice, without judgment.", duration: 20 },
-  { zone: 'Face & jaw', instruction: "Unclench your jaw. Soften your eyes, your forehead, your scalp. Let your whole face be at rest.", duration: 25 },
-  { zone: 'Whole body', instruction: "Now hold your whole body in awareness at once. Notice that you are here. That is enough.", duration: 30 },
-]
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { t } from '../mindease/i18n.js'
 
 export default function BodyScan({ theme, onClose }) {
   const [step, setStep] = useState(-1)
   const [secondsLeft, setSecondsLeft] = useState(0)
   const intervalRef = useRef(null)
+
+  const STEPS = useMemo(() => {
+    const raw = t('body_scan_steps') || []
+    // Match the durations from the original
+    const durations = [20, 20, 20, 25, 20, 25, 20, 20, 20, 25, 30]
+    return raw.map((s, i) => ({
+      zone: s.zone,
+      instruction: s.instr,
+      duration: durations[i] || 20
+    }))
+  }, [])
 
   useEffect(() => {
     if (step < 0 || step >= STEPS.length) return
@@ -34,7 +32,7 @@ export default function BodyScan({ theme, onClose }) {
       })
     }, 1000)
     return () => clearInterval(intervalRef.current)
-  }, [step])
+  }, [step, STEPS])
 
   const progress = step >= 0 && step < STEPS.length
     ? ((STEPS[step].duration - secondsLeft) / STEPS[step].duration)
@@ -45,16 +43,16 @@ export default function BodyScan({ theme, onClose }) {
       <div style={{ padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, textAlign: 'center' }}>
         <span style={{ fontSize: 48 }}>🧘</span>
         <div>
-          <h3 style={{ color: theme.text, fontSize: 18, fontWeight: 600, marginBottom: 8 }}>5-minute body scan</h3>
+          <h3 style={{ color: theme.text, fontSize: 18, fontWeight: 600, marginBottom: 8 }}>{t('body_scan_title')}</h3>
           <p style={{ color: theme.textMuted, fontSize: 13, lineHeight: 1.7 }}>
-            A guided journey through your body. Find a comfortable position, close your eyes when ready, and follow along.
+            {t('body_scan_intro')}
           </p>
         </div>
         <button onClick={() => setStep(0)} style={{ padding: '12px 32px', borderRadius: 10, border: 'none', background: theme.primary, color: 'white', fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
-          Begin
+          {t('begin')}
         </button>
         <button onClick={onClose} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: 13, cursor: 'pointer' }}>
-          Cancel
+          {t('cancel')}
         </button>
       </div>
     )
@@ -64,10 +62,10 @@ export default function BodyScan({ theme, onClose }) {
     return (
       <div style={{ padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, textAlign: 'center' }}>
         <span style={{ fontSize: 48 }}>🌿</span>
-        <h3 style={{ color: theme.text, fontSize: 18, fontWeight: 600 }}>Body scan complete</h3>
-        <p style={{ color: theme.textMuted, fontSize: 13, lineHeight: 1.7 }}>You just spent 5 minutes with yourself. That's a meaningful act of care.</p>
+        <h3 style={{ color: theme.text, fontSize: 18, fontWeight: 600 }}>{t('body_scan_complete')}</h3>
+        <p style={{ color: theme.textMuted, fontSize: 13, lineHeight: 1.7 }}>{t('body_scan_footer')}</p>
         <button onClick={onClose} style={{ padding: '12px 32px', borderRadius: 10, border: 'none', background: theme.primary, color: 'white', fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
-          Done
+          {t('done')}
         </button>
       </div>
     )
@@ -79,7 +77,7 @@ export default function BodyScan({ theme, onClose }) {
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
       <div style={{ fontSize: 12, color: theme.textMuted, letterSpacing: 1 }}>
-        {step + 1} of {STEPS.length}
+        {step + 1} {t('of')} {STEPS.length}
       </div>
       <svg width={100} height={100} viewBox="0 0 100 100">
         <circle cx={50} cy={50} r={40} fill="none" stroke={theme.border} strokeWidth={6} />
@@ -99,11 +97,11 @@ export default function BodyScan({ theme, onClose }) {
       <div style={{ display: 'flex', gap: 10 }}>
         {step > 0 && (
           <button onClick={() => setStep(s => s - 1)} style={{ padding: '10px 20px', borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.bgCard, color: theme.textMuted, fontSize: 14, cursor: 'pointer' }}>
-            ← Back
+            ← {t('back_btn')}
           </button>
         )}
         <button onClick={() => { clearInterval(intervalRef.current); setStep(s => s + 1) }} style={{ padding: '10px 24px', borderRadius: 10, border: 'none', background: theme.primary, color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-          Next →
+          {t('next_btn')} →
         </button>
       </div>
     </div>

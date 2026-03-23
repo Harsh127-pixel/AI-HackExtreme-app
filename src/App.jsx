@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { initSDK, getAccelerationMode } from './runanywhere.js'
-import { useSession, session, notify } from './focuscoach/sessionState.js'
+import { useSession, session, notify, setWellnessMode } from './focuscoach/sessionState.js'
+import usePomodoro from './focuscoach/usePomodoro.js'
 import { getTheme, applyTheme } from './mindease/theme.js'
 import { getLang, setLang, LANGUAGES, t } from './mindease/i18n.js'
 import MoodCheckIn from './components/MoodCheckIn.jsx'
@@ -11,12 +12,14 @@ import HomeTab from './components/tabs/HomeTab.jsx'
 import BreatheTab from './components/tabs/BreatheTab.jsx'
 import ReflectTab from './components/tabs/ReflectTab.jsx'
 import FocusTab from './components/tabs/FocusTab.jsx'
+import GlobalVoiceOrb from './components/GlobalVoiceOrb.jsx'
+import SOSMode from './components/SOSMode.jsx'
 
 const TABS = [
-  { id: 'home',    label: 'Home',    icon: HomeIcon },
-  { id: 'breathe', label: 'Breathe', icon: BreatheIcon },
-  { id: 'reflect', label: 'Reflect', icon: ReflectIcon },
-  { id: 'focus',   label: 'Focus',   icon: FocusIcon },
+  { id: 'home',    icon: HomeIcon },
+  { id: 'breathe', icon: BreatheIcon },
+  { id: 'reflect', icon: ReflectIcon },
+  { id: 'focus',   icon: FocusIcon },
 ]
 
 function HomeIcon({ active }) {
@@ -64,9 +67,11 @@ export function App() {
   const [onboarded, setOnboarded] = useState(() => !!localStorage.getItem('mindease_onboarded'))
   const [activeTab, setActiveTab] = useState('home')
   const [showCrisis, setShowCrisis] = useState(false)
+  const [showSOS, setShowSOS] = useState(false)
   const [showFollowUp, setShowFollowUp] = useState(false)
   const [loadProgress, setLoadProgress] = useState(0)
   const currentSession = useSession()
+  const pomodoro = usePomodoro()
   const prevTab = useRef('home')
 
   useEffect(() => {
@@ -112,6 +117,14 @@ export function App() {
     setActiveTab(id)
   }
 
+  const handleCrisis = (text) => {
+    console.log('[App] Crisis handled:', text)
+    localStorage.setItem('mindease_last_crisis', Date.now().toString())
+    setWellnessMode('anxiety')
+    setShowSOS(true)
+    setShowCrisis(true)
+  }
+
   if (sdkError) return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -140,10 +153,10 @@ export function App() {
       <div style={{ textAlign: 'center', animation: 'fadeIn 0.6s both' }}>
         <div style={{ fontSize: 52, marginBottom: 16 }}>🧠</div>
         <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
-          MindEase
+          {t('appName')}
         </h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginTop: 6 }}>
-          Your private AI companion
+          {t('tagline')}
         </p>
       </div>
       <div style={{ width: 220, animation: 'fadeIn 0.6s 0.2s both', opacity: 0 }}>
@@ -173,119 +186,131 @@ export function App() {
 
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column',
-      height: '100dvh', maxWidth: 480, margin: '0 auto',
-      background: 'var(--bg-base)', overflow: 'hidden',
+      display: 'flex', 
+      flexDirection: 'row', 
+      height: '100dvh', 
+      background: 'var(--bg-base)',
+      overflow: 'hidden',
       position: 'relative',
     }}>
+      <style>{`
+        .sidebar { display: flex; flex-direction: column; width: 280px; background: rgba(8,12,20,0.95); border-right: 1px solid var(--border-subtle); padding: 32px 24px; z-index: 50; }
+        .content-container { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; background: var(--bg-base); }
+        .main-content { flex: 1; overflow-y: auto; width: 100%; margin: 0 auto; max-width: 1000px; padding: 40px; }
+        .mobile-only { display: none; }
 
-      {/* Header */}
-      <header style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '14px 20px',
-        background: 'rgba(8,12,20,0.85)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        borderBottom: '1px solid var(--border-subtle)',
-        zIndex: 10, flexShrink: 0,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        @media (max-width: 1023px) {
+          .sidebar { display: none; }
+          .mobile-only { display: flex; }
+          .main-content { padding: 0; max-width: 480px; }
+        }
+      `}</style>
+      
+      {showSOS && <SOSMode onClose={() => setShowSOS(false)} />}
+
+      {/* Desktop Sidebar Navigation */}
+      <aside className="sidebar">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 48 }}>
           <div style={{
-            width: 32, height: 32, borderRadius: 10,
+            width: 40, height: 40, borderRadius: 12,
             background: `linear-gradient(135deg, ${theme.primary}, ${theme.accent})`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 16, boxShadow: `0 2px 8px ${theme.glow}`,
-          }}>
-            🧠
-          </div>
-          <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>
-            MindEase
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20
+          }}>🧠</div>
+          <span style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
+            {t('appName')}
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {accel && (
-            <span className="badge badge-accent" style={{ fontSize: 10 }}>
-              {accel === 'webgpu' ? '⚡ WebGPU' : '🔲 CPU'}
-            </span>
-          )}
-          {currentSession.wellnessMode && currentSession.wellnessMode !== 'okay' && (
-            <span className="badge" style={{
-              background: theme.primary + '18',
-              color: theme.primary,
-              border: `1px solid ${theme.primary}30`,
-              fontSize: 10,
-            }}>
-              {{ anxiety: '😰', depression: '😔', burnout: '🪫', stress: '😤' }[currentSession.wellnessMode]}
-              {' '}{currentSession.wellnessMode}
-            </span>
-          )}
-          <button
-            onClick={() => setLang(getLang() === 'en' ? 'hi' : 'en')}
-            className="btn btn-ghost btn-icon"
-            style={{ width: 32, height: 32, padding: 0, fontSize: 16 }}
-            title="Switch language"
-          >
-            {LANGUAGES[getLang() === 'en' ? 'hi' : 'en'].flag}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
+          {TABS.map(({ id, icon: Icon }) => {
+            const active = activeTab === id
+            return (
+              <button 
+                key={id} 
+                onClick={() => handleTabChange(id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 14,
+                  padding: '12px 18px', borderRadius: 14,
+                  background: active ? `${theme.primary}15` : 'transparent',
+                  color: active ? theme.primary : 'var(--text-muted)',
+                  border: 'none', cursor: 'pointer', transition: 'all 0.2s',
+                  fontWeight: active ? 600 : 500, fontSize: 16
+                }}
+              >
+                <Icon active={active} />
+                {t(id)}
+              </button>
+            )
+          })}
+        </div>
+
+        <div style={{ marginTop: 'auto', padding: '20px', background: 'rgba(255,255,255,0.03)', borderRadius: 20 }}>
+           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+             <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('language')}</span>
+             <button onClick={() => setLang(getLang() === 'en' ? 'hi' : 'en')} className="btn btn-ghost" style={{ fontSize: 18 }}>
+               {LANGUAGES[getLang() === 'en' ? 'hi' : 'en'].flag}
+             </button>
+           </div>
+        </div>
+      </aside>
+
+      <div className="content-container">
+        {/* Mobile Header */}
+        <header className="mobile-only" style={{
+          alignItems: 'center', justifyContent: 'space-between',
+          padding: '14px 20px', background: 'rgba(8,12,20,0.85)', backdropFilter: 'blur(16px)',
+          borderBottom: '1px solid var(--border-subtle)', zIndex: 10, width: '100%'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>{t('appName')}</span>
+          </div>
+          <button onClick={() => setLang(getLang() === 'en' ? 'hi' : 'en')} className="btn btn-ghost" style={{ fontSize: 18 }}>
+             {LANGUAGES[getLang() === 'en' ? 'hi' : 'en'].flag}
           </button>
-        </div>
-      </header>
+        </header>
 
-      {/* Crisis banner */}
-      {showCrisis && (
-        <div style={{ flexShrink: 0, animation: 'slideUp 0.3s both' }}>
-          <CrisisCard onDismiss={() => setShowCrisis(false)} />
-        </div>
-      )}
+        {showCrisis && (
+          <div style={{ flexShrink: 0, animation: 'slideUp 0.3s both', padding: '10px 0' }}>
+            <CrisisCard onDismiss={() => setShowCrisis(false)} />
+          </div>
+        )}
 
-      {/* Scrollable tab content */}
-      <main style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' }}>
-        <div key={activeTab} style={{ animation: 'fadeIn 0.2s both' }}>
-          {activeTab === 'home'    && <HomeTab    theme={theme} />}
-          {activeTab === 'breathe' && <BreatheTab theme={theme} onVoiceNeeded={() => handleTabChange('focus')} />}
-          {activeTab === 'reflect' && <ReflectTab theme={theme} onVoiceNeeded={() => handleTabChange('focus')} />}
-          {activeTab === 'focus'   && <FocusTab   theme={theme} onCrisis={() => setShowCrisis(true)} />}
-        </div>
-      </main>
+        <main className="main-content">
+          <div key={activeTab} style={{ animation: 'fadeIn 0.4s both' }}>
+            {activeTab === 'home'    && <HomeTab    theme={theme} />}
+            {activeTab === 'breathe' && <BreatheTab theme={theme} onVoiceNeeded={() => handleTabChange('focus')} />}
+            {activeTab === 'reflect' && <ReflectTab theme={theme} onVoiceNeeded={() => handleTabChange('focus')} />}
+            {activeTab === 'focus'   && <FocusTab   theme={theme} onCrisis={handleCrisis} />}
+          </div>
+        </main>
 
-      {/* Bottom nav */}
-      <nav style={{
-        display: 'flex',
-        background: 'rgba(8,12,20,0.92)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        borderTop: '1px solid var(--border-subtle)',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-        flexShrink: 0, zIndex: 10,
-      }}>
-        {TABS.map(({ id, label, icon: Icon }) => {
-          const active = activeTab === id
-          return (
-            <button key={id} onClick={() => handleTabChange(id)} style={{
-              flex: 1, padding: '10px 4px 11px',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-              background: 'transparent', border: 'none', cursor: 'pointer',
-              color: active ? theme.primary : 'var(--text-muted)',
-              transition: 'color var(--transition-fast)',
-              position: 'relative',
-            }}>
-              {active && (
-                <span style={{
-                  position: 'absolute', top: 0, left: '50%',
-                  transform: 'translateX(-50%)',
-                  width: 24, height: 2, borderRadius: '0 0 4px 4px',
-                  background: theme.primary,
-                  boxShadow: `0 2px 8px ${theme.glow}`,
-                }} />
-              )}
-              <Icon active={active} />
-              <span style={{ fontSize: 10, fontWeight: active ? 600 : 400, letterSpacing: '0.2px' }}>
-                {label}
-              </span>
-            </button>
-          )
-        })}
-      </nav>
+        <GlobalVoiceOrb 
+          theme={theme} 
+          activeTab={activeTab} 
+          onTabChange={handleTabChange}
+          onCrisis={handleCrisis}
+        />
+
+        {/* Mobile Navigation */}
+        <nav className="mobile-only" style={{
+          background: 'rgba(8,12,20,0.92)', backdropFilter: 'blur(16px)',
+          borderTop: '1px solid var(--border-subtle)', paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          width: '100%',
+        }}>
+          {TABS.map(({ id, icon: Icon }) => {
+            const active = activeTab === id
+            return (
+              <button key={id} onClick={() => handleTabChange(id)} style={{
+                flex: 1, padding: '12px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                background: 'transparent', border: 'none', color: active ? theme.primary : 'var(--text-muted)',
+              }}>
+                <Icon active={active} />
+                <span style={{ fontSize: 10, fontWeight: active ? 600 : 400 }}>{t(id)}</span>
+              </button>
+            )
+          })}
+        </nav>
+      </div>
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { t } from '../mindease/i18n.js'
 
 const STORAGE_KEY = 'mindease_saved_affirmations'
 
@@ -44,7 +45,7 @@ export default function AffirmationWall({ theme, aiAffirmations = [] }) {
           border: `1px solid ${theme.primary}`,
           textAlign: 'center',
         }}>
-          <div style={{ fontSize: 11, color: theme.textMuted, marginBottom: 8, letterSpacing: 1, textTransform: 'uppercase' }}>Today's affirmation</div>
+          <div style={{ fontSize: 11, color: theme.textMuted, marginBottom: 8, letterSpacing: 1, textTransform: 'uppercase' }}>{t('todays_affirmation')}</div>
           <div style={{ fontSize: 15, color: theme.text, lineHeight: 1.6, fontStyle: 'italic' }}>"{daily.text}"</div>
         </div>
       )}
@@ -52,7 +53,7 @@ export default function AffirmationWall({ theme, aiAffirmations = [] }) {
       {/* AI-generated unsaved affirmations */}
       {aiAffirmations.length > 0 && (
         <div>
-          <div style={{ fontSize: 11, color: theme.textMuted, marginBottom: 8, letterSpacing: 0.5 }}>From your last AI session — tap ♡ to save</div>
+          <div style={{ fontSize: 11, color: theme.textMuted, marginBottom: 8, letterSpacing: 0.5 }}>{t('ai_sessions_tip')}</div>
           {aiAffirmations.map((text, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: theme.bgCard, borderRadius: 10, marginBottom: 6, border: `1px solid ${theme.border}` }}>
               <span style={{ flex: 1, fontSize: 13, color: theme.text, lineHeight: 1.5 }}>{text}</span>
@@ -67,7 +68,7 @@ export default function AffirmationWall({ theme, aiAffirmations = [] }) {
       {/* Saved wall */}
       {saved.length > 0 && (
         <div>
-          <div style={{ fontSize: 11, color: theme.textMuted, marginBottom: 8, letterSpacing: 0.5 }}>Saved affirmations ({saved.length})</div>
+          <div style={{ fontSize: 11, color: theme.textMuted, marginBottom: 8, letterSpacing: 0.5 }}>{t('saved_affirmations')} ({saved.length})</div>
           {saved.map(a => (
             <div key={a.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', background: theme.bgCard, borderRadius: 10, marginBottom: 6, border: `1px solid ${theme.border}` }}>
               <span style={{ flex: 1, fontSize: 13, color: theme.text, lineHeight: 1.5 }}>{a.text}</span>
@@ -84,15 +85,15 @@ export default function AffirmationWall({ theme, aiAffirmations = [] }) {
             value={custom}
             onChange={e => setCustom(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && addCustom()}
-            placeholder="Write your own affirmation..."
+            placeholder={t('write_own_affirmation')}
             style={{ flex: 1, padding: '10px 12px', background: theme.bgInput, border: `1px solid ${theme.border}`, borderRadius: 10, color: theme.text, fontSize: 13, outline: 'none' }}
           />
-          <button onClick={addCustom} style={{ padding: '10px 14px', borderRadius: 10, border: 'none', background: theme.primary, color: 'white', fontSize: 13, cursor: 'pointer' }}>Save</button>
-          <button onClick={() => setAdding(false)} style={{ padding: '10px 12px', borderRadius: 10, border: `1px solid ${theme.border}`, background: 'transparent', color: theme.textMuted, fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+          <button onClick={addCustom} style={{ padding: '10px 14px', borderRadius: 10, border: 'none', background: theme.primary, color: 'white', fontSize: 13, cursor: 'pointer' }}>{t('save')}</button>
+          <button onClick={() => setAdding(false)} style={{ padding: '10px 12px', borderRadius: 10, border: `1px solid ${theme.border}`, background: 'transparent', color: theme.textMuted, fontSize: 13, cursor: 'pointer' }}>{t('cancel')}</button>
         </div>
       ) : (
         <button onClick={() => setAdding(true)} style={{ width: '100%', padding: '10px 0', borderRadius: 10, border: `1px dashed ${theme.border}`, background: 'transparent', color: theme.textMuted, fontSize: 13, cursor: 'pointer' }}>
-          + Write your own affirmation
+          {t('add_own_affirmation')}
         </button>
       )}
     </div>

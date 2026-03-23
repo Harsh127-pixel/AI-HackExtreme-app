@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSession } from '../focuscoach/sessionState.js'
+import { t } from '../mindease/i18n.js'
 
 export default function SessionSummaryCard({ theme, prevPomodoroCount }) {
   const session = useSession()
@@ -40,7 +41,7 @@ export default function SessionSummaryCard({ theme, prevPomodoroCount }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 4 }}>
-            Session complete 🍅 #{summary.count}
+            {t('session_complete')} 🍅 #{summary.count}
           </div>
           <div style={{ fontSize: 15, fontWeight: 500, color: theme.text }}>
             25 minutes on "{summary.task}"

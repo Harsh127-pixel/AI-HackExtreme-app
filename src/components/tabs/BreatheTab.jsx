@@ -5,6 +5,7 @@ import SOSMode from '../SOSMode.jsx'
 import AmbientSounds from '../AmbientSounds.jsx'
 import BodyScan from '../BodyScan.jsx'
 import AffirmationWall from '../AffirmationWall.jsx'
+import { t } from '../../mindease/i18n.js'
 
 export default function BreatheTab({ theme, onVoiceNeeded }) {
   const currentSession = useSession()
@@ -37,9 +38,9 @@ export default function BreatheTab({ theme, onVoiceNeeded }) {
           display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0,
         }}>🆘</div>
         <div style={{ textAlign: 'left' }}>
-          <div style={{ fontSize: 15, fontWeight: 700 }}>Anxiety SOS</div>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>{t('anxiety_sos')}</div>
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
-            Instant grounding when panic hits
+            {t('sos_desc')}
           </div>
         </div>
         <svg style={{ marginLeft: 'auto' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -57,14 +58,14 @@ export default function BreatheTab({ theme, onVoiceNeeded }) {
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
             }}>🫁</div>
             <div>
-              <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>Guided breathing</p>
-              <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 1 }}>Box · 4-7-8 · Deep breath</p>
+              <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>{t('guided_breathing')}</p>
+              <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 1 }}>{t('breathing_desc')}</p>
             </div>
           </div>
           <button className={`btn btn-sm ${showBreathing ? 'btn-ghost' : ''}`}
             style={{ background: showBreathing ? 'transparent' : theme.primary, border: 'none', color: showBreathing ? 'var(--text-secondary)' : '#fff' }}
             onClick={() => setShowBreathing(v => !v)}>
-            {showBreathing ? 'Close' : 'Start'}
+            {showBreathing ? t('close_btn') : t('start')}
           </button>
         </div>
         {showBreathing && (
@@ -84,14 +85,14 @@ export default function BreatheTab({ theme, onVoiceNeeded }) {
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
             }}>🧘</div>
             <div>
-              <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>Body scan</p>
-              <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 1 }}>5-minute guided relaxation</p>
+              <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>{t('body_scan')}</p>
+              <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 1 }}>{t('body_scan_desc')}</p>
             </div>
           </div>
           <button className="btn btn-sm"
             style={{ background: showBodyScan ? 'transparent' : theme.primary + '18', border: `1px solid ${theme.primary}30`, color: showBodyScan ? 'var(--text-secondary)' : theme.primary }}
             onClick={() => setShowBodyScan(v => !v)}>
-            {showBodyScan ? 'Close' : 'Start'}
+            {showBodyScan ? t('close_btn') : t('start')}
           </button>
         </div>
         {showBodyScan && (
@@ -106,7 +107,7 @@ export default function BreatheTab({ theme, onVoiceNeeded }) {
 
       {/* Affirmations */}
       <div className="card">
-        <p className="section-label" style={{ marginBottom: 14 }}>✨ Affirmations</p>
+        <p className="section-label" style={{ marginBottom: 14 }}>{t('affirmations')}</p>
         <AffirmationWall theme={theme} aiAffirmations={affirmations} />
         <button className="btn btn-primary" onClick={() => {
           session.mode = 'affirmations'; notify(); onVoiceNeeded()
@@ -114,13 +115,13 @@ export default function BreatheTab({ theme, onVoiceNeeded }) {
           width: '100%', marginTop: 12, background: theme.primary, border: 'none',
           boxShadow: `0 2px 8px ${theme.glow}`,
         }}>
-          ✨ Generate new affirmations
+          {t('gen_affirmations')}
         </button>
       </div>
 
       {/* Crisis resources */}
       <div className="card">
-        <p className="section-label" style={{ marginBottom: 14 }}>💙 Support resources</p>
+        <p className="section-label" style={{ marginBottom: 14 }}>{t('support_resources')}</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
           {[
             { label: 'iCall India', detail: '9152987821', href: 'https://icallhelpline.org', emoji: '📞' },

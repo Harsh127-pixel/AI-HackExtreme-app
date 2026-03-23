@@ -1,58 +1,64 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { session, notify } from './sessionState.js';
+import { useEffect, useRef, useCallback } from 'react';
+import { session, notify, setPomodoroState } from './sessionState.js';
 import { playChime } from '../mindease/usePomodoroChime.js';
 
 const FOCUS_DURATION = 25 * 60;
 const BREAK_DURATION = 5 * 60;
 
 export default function usePomodoro() {
-  const [phase, setPhase] = useState('focus');
-  const [secondsLeft, setSecondsLeft] = useState(FOCUS_DURATION);
-  const [isRunning, setIsRunning] = useState(false);
   const timerRef = useRef(null);
 
-  const totalSeconds = phase === 'focus' ? FOCUS_DURATION : BREAK_DURATION;
+  const start = useCallback(() => {
+    setPomodoroState({ pomodoroRunning: true });
+  }, []);
 
-  const start = useCallback(() => setIsRunning(true), []);
-  const pause = useCallback(() => setIsRunning(false), []);
+  const pause = useCallback(() => {
+    setPomodoroState({ pomodoroRunning: false });
+  }, []);
 
   const reset = useCallback(() => {
-    setIsRunning(false);
-    setSecondsLeft(phase === 'focus' ? FOCUS_DURATION : BREAK_DURATION);
-  }, [phase]);
+    const dur = session.pomodoroPhase === 'focus' ? FOCUS_DURATION : BREAK_DURATION;
+    setPomodoroState({
+      pomodoroRunning: false,
+      pomodoroSecondsLeft: dur,
+      pomodoroDuration: dur
+    });
+  }, []);
 
   const switchPhase = useCallback(() => {
-    const nextPhase = phase === 'focus' ? 'break' : 'focus';
-    if (phase === 'focus') {
+    const nextPhase = session.pomodoroPhase === 'focus' ? 'break' : 'focus';
+    if (session.pomodoroPhase === 'focus') {
       session.pomodoroCount++;
-      playChime('focus'); // Signal focus is OVER
+      playChime('focus');
     } else {
-      playChime('break'); // Signal break is OVER
+      playChime('break');
     }
-    setPhase(nextPhase);
-    session.pomodoroPhase = nextPhase;
-    setSecondsLeft(nextPhase === 'focus' ? FOCUS_DURATION : BREAK_DURATION);
-    setIsRunning(true);
-    notify();
-  }, [phase]);
+    const dur = nextPhase === 'focus' ? FOCUS_DURATION : BREAK_DURATION;
+    setPomodoroState({
+      pomodoroPhase: nextPhase,
+      pomodoroSecondsLeft: dur,
+      pomodoroDuration: dur,
+      pomodoroRunning: true
+    });
+  }, []);
 
   const skip = useCallback(() => {
     switchPhase();
   }, [switchPhase]);
 
   useEffect(() => {
-    if (isRunning && secondsLeft > 0) {
+    if (session.pomodoroRunning && session.pomodoroSecondsLeft > 0) {
       timerRef.current = setInterval(() => {
-        setSecondsLeft((s) => s - 1);
+        setPomodoroState({ pomodoroSecondsLeft: session.pomodoroSecondsLeft - 1 });
       }, 1000);
-    } else if (secondsLeft === 0) {
+    } else if (session.pomodoroSecondsLeft <= 0 && session.pomodoroRunning) {
       switchPhase();
     }
     return () => clearInterval(timerRef.current);
-  }, [isRunning, secondsLeft, switchPhase]);
+  }, [session.pomodoroRunning, session.pomodoroSecondsLeft, switchPhase]);
 
-  const formattedTime = `${Math.floor(secondsLeft / 60)}:${(secondsLeft % 60).toString().padStart(2, '0')}`;
-  const progress = secondsLeft / totalSeconds;
+  const formattedTime = `${Math.floor(session.pomodoroSecondsLeft / 60)}:${(session.pomodoroSecondsLeft % 60).toString().padStart(2, '0')}`;
+  const progress = session.pomodoroSecondsLeft / session.pomodoroDuration;
 
   const handleVoiceCommand = useCallback((transcript) => {
     const t = transcript.toLowerCase();
@@ -76,9 +82,9 @@ export default function usePomodoro() {
   }, [start, pause, skip, reset]);
 
   return {
-    secondsLeft,
-    isRunning,
-    phase,
+    secondsLeft: session.pomodoroSecondsLeft,
+    isRunning: session.pomodoroRunning,
+    phase: session.pomodoroPhase,
     progress,
     formattedTime,
     start,
