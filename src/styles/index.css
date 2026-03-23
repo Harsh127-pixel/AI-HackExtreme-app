@@ -700,3 +700,12 @@ body {
 }
 
 .text-muted { color: var(--text-muted); font-size: 13px; }
+
+.spinner {
+  border-top-color: var(--t-primary, #F59E0B) !important;
+}
+
+@keyframes fadeIn { 
+  from { opacity: 0; transform: translateY(-8px); } 
+  to { opacity: 1; transform: translateY(0); } 
+}
