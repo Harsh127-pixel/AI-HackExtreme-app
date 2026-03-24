@@ -5,12 +5,14 @@ import SOSMode from '../SOSMode.jsx'
 import AmbientSounds from '../AmbientSounds.jsx'
 import BodyScan from '../BodyScan.jsx'
 import AffirmationWall from '../AffirmationWall.jsx'
+import SleepStoryPlayer from '../SleepStoryPlayer.jsx'
 import { t } from '../../mindease/i18n.js'
 
 export default function BreatheTab({ theme, onVoiceNeeded }) {
   const currentSession = useSession()
   const [showBreathing, setShowBreathing] = useState(false)
   const [showBodyScan, setShowBodyScan] = useState(false)
+  const [showSleep, setShowSleep] = useState(false)
   const [showSOS, setShowSOS] = useState(false)
   const [affirmations] = useState(currentSession.affirmations)
 
@@ -99,6 +101,35 @@ export default function BreatheTab({ theme, onVoiceNeeded }) {
           <div style={{ marginTop: 16, borderTop: '1px solid var(--border-subtle)', paddingTop: 4 }}>
             <BodyScan theme={theme} onClose={() => setShowBodyScan(false)} />
           </div>
+        )}
+      </div>
+
+      {/* Sleep Story */}
+      <div className="card" style={{ overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: 'rgba(129, 140, 248, 0.18)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
+            }}>🌙</div>
+            <div>
+              <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>Sleep Story</p>
+              <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 1 }}>AI tells you a calming nature story</p>
+            </div>
+          </div>
+          <button className="btn btn-sm"
+            style={{ background: theme.primary + '18', border: `1px solid ${theme.primary}30`, color: theme.primary }}
+            onClick={() => {
+              session.mode = 'sleep'
+              notify()
+              setShowSleep(true)
+            }}>
+            {t('start')}
+          </button>
+        </div>
+        {showSleep && (
+           <SleepStoryPlayer theme={theme} onClose={() => setShowSleep(false)} />
         )}
       </div>
 

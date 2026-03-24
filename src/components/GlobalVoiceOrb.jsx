@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { session, notify, setSteps } from '../focuscoach/sessionState.js'
+import { session, notify, setSteps, claimVoice, releaseVoice } from '../focuscoach/sessionState.js'
 import buildSystemPrompt from '../focuscoach/systemPrompt.js'
 import usePomodoro from '../focuscoach/usePomodoro.js'
 import {
@@ -7,7 +7,9 @@ import {
   AudioCapture, AudioPlayback, SpeechActivity, EventBus
 } from '@runanywhere/web'
 import { VAD } from '@runanywhere/web-onnx'
-import { t } from '../mindease/i18n.js'
+import { playSound, stopSound } from '../mindease/ambientSounds.js'
+import { t, getLang } from '../mindease/i18n.js'
+import { getAIAction } from '../mindease/aiUtils.js'
 
 function parseSteps(text) {
   return text.split('\n').filter(l => /^\d+[\.\)]\s/.test(l.trim())).map((l, i) => ({
@@ -31,6 +33,15 @@ export default function GlobalVoiceOrb({ theme, activeTab, onCrisis, onTabChange
   const vadUnsubRef = useRef(null)
   const analyserRef = useRef(null)
   const rafRef = useRef(null)
+  const convHistoryRef = useRef([]) // [{ role: 'user' | 'assistant', content: string }]
+  const lastActivityRef = useRef(Date.now())
+  const vadTransitionsRef = useRef(0)
+  const lastVadStateRef = useRef(SpeechActivity.Ended)
+  const playbackRef = useRef(null)
+  const silenceTimerRef = useRef(null)
+  const partialProcessingRef = useRef(false)
+  const partialTimerRef = useRef(null)
+  const audioBufferRef = useRef([])
 
   // Haptic Feedback helper
   const triggerHaptic = (pattern = 50) => {
@@ -65,6 +76,22 @@ export default function GlobalVoiceOrb({ theme, activeTab, onCrisis, onTabChange
     setLoadingModels(false); return true
   }
 
+  const voiceId = 'global-voice-orb'
+
+  // Clear history on tab switch or silence
+  useEffect(() => {
+    convHistoryRef.current = []
+    setHistory([])
+    const unsubVoice = EventBus.shared.on('voice.stop', (evt) => {
+      if (evt?.except !== voiceId) stopVoice()
+    })
+    return () => {
+      unsubVoice();
+      stopVoice();
+      releaseVoice(voiceId);
+    }
+  }, [activeTab])
+
   const speakResponse = useCallback(async (text) => {
     const tts = ModelManager.getLoadedModel(ModelCategory.SpeechSynthesis)
     if (!tts) return
@@ -72,43 +99,135 @@ export default function GlobalVoiceOrb({ theme, activeTab, onCrisis, onTabChange
     setResponse(text)
     setShowPanel(true)
     try {
-      const { audio, sampleRate } = await tts.synthesize(text)
+      const synthFunc = getAIAction(tts, ['synthesize', 'generate', 'speak'])
+      if (!synthFunc) { console.error('TTS engine match failed'); setVoiceState('idle'); return }
+      
+      const res = await synthFunc(text)
+      const { audio, sampleRate } = typeof res === 'object' && res.audio ? res : { audio: res, sampleRate: 16000 }
       const p = new AudioPlayback({ sampleRate })
+      playbackRef.current = p
       await p.play(audio, sampleRate)
       p.dispose()
-    } catch (e) { console.error(e) } 
-    finally { setVoiceState('idle') }
+      playbackRef.current = null
+    } catch (e) { console.error('TTS execution failed:', e) }
+    setVoiceState('idle')
   }, [])
 
   const processSpeech = useCallback(async (audioData) => {
     setVoiceState('processing')
     try {
-      const { STT } = await import('@runanywhere/web-onnx')
-      const result = await STT.transcribe(new Float32Array(audioData), { language: 'en' })
-      let text = result.text?.trim()?.toLowerCase() || ''
-      if (!text) { setVoiceState('idle'); return }
+      const currentLang = getLang();
+      let stt = ModelManager.getLoadedModel(ModelCategory.SpeechRecognition);
+      
+      if (!stt) {
+        console.warn('STT model not found, attempting lazy load...');
+        const { STT } = await import('@runanywhere/web-onnx');
+        stt = STT;
+      }
 
+      const transcribeFn = getAIAction(stt, ['transcribe', 'predict', 'generate']);
+      if (!transcribeFn) throw new Error('No transcription function discovered');
+
+      let text = '';
+      try {
+        const result = await transcribeFn(new Float32Array(audioData), { language: currentLang });
+        text = typeof result === 'string' ? result : (result.text || '');
+      } catch (e) {
+        console.error(`STT lang ${currentLang} failed, retry en`, e);
+        const result = await transcribeFn(new Float32Array(audioData), { language: 'en' });
+        text = typeof result === 'string' ? result : (result.text || '');
+      }
+
+      text = text.trim().toLowerCase();
+      console.log("[GlobalVoiceOrb] Heard:", text);
+      if (!text) { setVoiceState('idle'); return }
       setTranscript(text)
       setShowPanel(true)
 
+      // Crisis detection - highest priority
+      const crisisRegex = /i('m| am) not okay|help me|i can't (do|take|handle) this|i want to (die|disappear|give up)|i feel (hopeless|worthless)|panic|can't breathe|anxiety attack/i
+      if (crisisRegex.test(text)) {
+        onCrisis && onCrisis()
+        session.mode = 'sos'; notify()
+        await speakResponse("I hear you. I'm right here with you. Let's breathe together. In... 2... 3... 4... Hold... 2... 3... 4... Out slowly... 2... 3... 4... 5... 6. You are safe.")
+        return
+      }
+
       // Navigation logic
+      // English & Hindi Navigation logic (High Priority)
       const NAV_MAP = {
-        home: { keywords: [/home/, /dashboard/], msg: "Opening dashboard." },
-        breathe: { keywords: [/breath/], msg: "Let's breathe." },
-        reflect: { keywords: [/reflect/, /journal/], msg: "Opening journal." },
-        focus: { keywords: [/focus/], msg: "Starting focus." },
+        home: { keywords: [/home/i, /dashboard/i, /main/i, /घर/i, /वापस/i], msg: currentLang === 'hi' ? "डैशबोर्ड खोल रहा हूँ।" : "Opening dashboard." },
+        breathe: { keywords: [/breath/i, /relax/i, /peace/i, /शांत/i, /सांस/i], msg: currentLang === 'hi' ? "चलिए कुछ सांस लेते हैं।" : "Let's take some breaths." },
+        reflect: { keywords: [/reflect/i, /journal/i, /diary/i, /think/i, /डायरी/i, /विचार/i], msg: currentLang === 'hi' ? "डायरी खोल रहा हूँ।" : "Opening your journal." },
+        focus: { keywords: [/focus/i, /work/i, /study/i, /तनाव/i, /ध्यान/i], msg: currentLang === 'hi' ? "फोकस सत्र शुरू हो रहा है।" : "Starting focus mode." },
       }
       for (const [id, data] of Object.entries(NAV_MAP)) {
         if (data.keywords.some(k => k.test(text))) {
+          console.log("[GlobalVoiceOrb] Nav Command Matched:", id);
           onTabChange(id); await speakResponse(data.msg); return
         }
       }
 
+      // Sound commands - detect before LLM (Bilingual support)
+      const SOUND_MAP = [
+        { id: 'rain', regex: [/rain/i, /rainy/i, /बारिश/i, /पानी/i], label: currentLang === 'hi' ? "बारिश की आवाज़" : "rain sounds" },
+        { id: 'whiteNoise', regex: [/white.?noise/i, /static/i, /शोर/i], label: currentLang === 'hi' ? "व्हाइट नॉइज़" : "white noise" },
+        { id: 'forest', regex: [/forest/i, /nature/i, /trees/i, /जंगल/i, /प्रकृति/i], label: currentLang === 'hi' ? "जंगल की आवाज़" : "forest sounds" },
+        { id: 'focus', regex: [/focus.?music/i, /focus.?hum/i, /hum/i, /तनाव/i], label: currentLang === 'hi' ? "फोकस संगीत" : "focus hum" },
+        { id: 'binaural', regex: [/binaural/i, /beats/i, /धुन/i], label: "binaural beats" },
+        { id: 'cafe', regex: [/cafe/i, /coffee/i, /ambient/i, /भीड़/i], label: currentLang === 'hi' ? "कैफे का माहौल" : "cafe noise" },
+      ]
+      for (const s of SOUND_MAP) {
+        if (s.regex.some(r => r.test(text))) {
+          console.log("[GlobalVoiceOrb] Sound Command Matched:", s.id);
+          playSound(s.id); await speakResponse(currentLang === 'hi' ? `${s.label} शुरू कर रहा हूँ।` : `Playing ${s.label}.`); return
+        }
+      }
+      if (/stop.?(sound|music|noise)|silence|quiet|बंद|चुप|काफी/i.test(text)) {
+        console.log("[GlobalVoiceOrb] Stop Command Matched");
+        stopSound(); await speakResponse(currentLang === 'hi' ? "ध्वनि बंद हो गई है।" : "Ambient sound stopped."); return
+      }
+
+      // Voice Tone Analysis
+      const samples = new Float32Array(audioData)
+      let sum = 0, sumSq = 0
+      for (let i = 0; i < samples.length; i++) {
+        const s = samples[i]
+        sum += s; sumSq += s * s
+      }
+      const variance = (sumSq / samples.length) - ((sum / samples.length) ** 2)
+
+      // Heuristic: Var > 0.05 is highly agitated (loud/peaky), transitions > 6 per 10s is rushed
+      // transitions count is already updated in real-time
+      const vScore = Math.min(variance * 10, 0.5) // Variance contribution
+      const rScore = Math.min(vadTransitionsRef.current / 12, 0.5) // Rhythm contribution
+      session.voiceEmotionScore = vScore + rScore
+      notify()
+
       const tMode = { home: 'idle', breathe: 'breathing', reflect: 'journal', focus: 'focus' }[activeTab] || session.mode
-      const prompt = buildSystemPrompt({ ...session, mode: tMode })
+      const systemPrompt = buildSystemPrompt({ ...session, mode: tMode })
+
+      // Multi-turn: Build conversation context
+      let context = ""
+      if (convHistoryRef.current.length > 0) {
+        context = "Previous conversation:\n" + convHistoryRef.current.map(h =>
+          `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.content}`
+        ).join('\n') + "\n\n"
+      }
+
       const llm = ModelManager.getLoadedModel(ModelCategory.Language)
-      const res = await llm.generateText(`${prompt}\n\nUser: ${text}\nResponse:`, { maxTokens: 100, stop: ['User:', '\n\n'] })
-      
+      const genFunc = llm && (llm.generateText || llm.generate || llm.predict || llm.chat)?.bind(llm)
+      if (!genFunc) { setVoiceState('idle'); return }
+      const res = await genFunc(`${systemPrompt}\n\n${context}User: ${text}\nAssistant:`, {
+        maxTokens: 100, stop: ['User:', '\n\n']
+      })
+
+      // Update history reference
+      convHistoryRef.current.push({ role: 'user', content: text })
+      convHistoryRef.current.push({ role: 'assistant', content: res })
+      if (convHistoryRef.current.length > 10) convHistoryRef.current = convHistoryRef.current.slice(-10) // 5 turns = 10 messages
+      lastActivityRef.current = Date.now()
+
       pomodoro.handleVoiceCommand(text)
       const steps = parseSteps(res)
       if (steps.length >= 2) setSteps(steps)
@@ -120,51 +239,114 @@ export default function GlobalVoiceOrb({ theme, activeTab, onCrisis, onTabChange
     } catch (err) { setVoiceState('idle') }
   }, [activeTab, pomodoro, onCrisis, onTabChange, speakResponse])
 
+  const stopVoice = useCallback(() => {
+    micRef.current?.stop()
+    vadUnsubRef.current?.()
+    playbackRef.current?.dispose() // Dispose of active playback
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current)
+    if (partialTimerRef.current) clearInterval(partialTimerRef.current)
+    setVoiceState('idle')
+  }, [])
+
   const startListening = async () => {
     const ready = await ensureModels()
     if (!ready) return
-    
+
+    // Check for 10 min silence (600,000 ms)
+    if (Date.now() - lastActivityRef.current > 600000) {
+      convHistoryRef.current = []; setHistory([])
+    }
+
     triggerHaptic(60)
+    claimVoice(voiceId)
     setVoiceState('listening')
     setTranscript(''); setResponse('')
-    
+    vadTransitionsRef.current = 0 // Reset analysis for this turn
+
     const mic = new AudioCapture({ sampleRate: 16000 })
     micRef.current = mic
     VAD.reset()
-    
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
-    const analyser = audioCtx.createAnalyser()
-    analyser.fftSize = 256
-    analyserRef.current = analyser
 
     vadUnsubRef.current = VAD.onSpeechActivity((activity) => {
+      console.log("[GlobalVoiceOrb] VAD Activity:", activity)
+      if (activity !== lastVadStateRef.current) {
+        vadTransitionsRef.current++
+        lastVadStateRef.current = activity
+      }
+      
+      if (activity === SpeechActivity.Started) {
+        audioBufferRef.current = [] // Reset buffer for new speech segment
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current)
+          silenceTimerRef.current = null
+        }
+      }
+
       if (activity === SpeechActivity.Ended) {
-        const seg = VAD.popSpeechSegment()
-        if (seg && seg.samples.length > 1600) processSpeech(seg.samples)
-        else stopListening()
+        // More "patient" detection: Wait 1s of silence before processing
+        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current)
+        silenceTimerRef.current = setTimeout(() => {
+          const seg = VAD.popSpeechSegment()
+          if (seg && seg.samples.length > 4000) { // More robust min length (0.25s)
+            processSpeech(seg.samples)
+            silenceTimerRef.current = null
+          } else {
+            stopListening()
+          }
+        }, 1200) // 1.2s of "patience" for pauses
       }
     })
 
+    partialTimerRef.current = setInterval(async () => {
+      if (lastVadStateRef.current === SpeechActivity.Started && !partialProcessingRef.current && audioBufferRef.current.length > 8000) {
+        partialProcessingRef.current = true
+        try {
+          const stt = ModelManager.getLoadedModel(ModelCategory.SpeechRecognition)
+          if (stt) {
+            const transcribeFn = getAIAction(stt, ['transcribe', 'predict', 'generate'])
+            if (transcribeFn) {
+              const result = await transcribeFn(new Float32Array(audioBufferRef.current), { language: getLang() })
+              const text = (typeof result === 'string' ? result : (result.text || '')).trim()
+              if (text && lastVadStateRef.current === SpeechActivity.Started) {
+                setTranscript(text)
+                if (!showPanel) setShowPanel(true)
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("Partial STT failed:", e)
+        } finally {
+          partialProcessingRef.current = false
+        }
+      }
+    }, 1200)
+
     await mic.start((chunk) => {
       VAD.processSamples(chunk)
-      // Level check for waveform
+      
       let sum = 0
       for (let i = 0; i < chunk.length; i++) sum += Math.abs(chunk[i])
       setAudioLevel(sum / chunk.length)
+
+      if (lastVadStateRef.current === SpeechActivity.Started) {
+        audioBufferRef.current.push(...chunk)
+      }
     })
   }
 
   const stopListening = () => {
-    micRef.current?.stop(); vadUnsubRef.current?.()
-    triggerHaptic([40, 30, 40])
-    setVoiceState('idle'); setAudioLevel(0)
+    stopVoice() // Use the new stopVoice function
+    if (voiceState === 'idle') {
+      releaseVoice(voiceId)
+    }
+    setAudioLevel(0)
   }
 
   const handleClick = () => {
     if (loadingModels || voiceState === 'processing') return
     if (voiceState === 'idle') startListening()
     else if (voiceState === 'listening') stopListening()
-    else if (voiceState === 'speaking') { setVoiceState('idle'); setShowPanel(false) }
+    else if (voiceState === 'speaking') { stopVoice(); setShowPanel(false) } // Use stopVoice for speaking state
   }
 
   return (
@@ -182,8 +364,16 @@ export default function GlobalVoiceOrb({ theme, activeTab, onCrisis, onTabChange
         boxShadow: '0 -20px 40px rgba(0,0,0,0.4)',
       }}>
         <div style={{ alignSelf: 'center', width: 40, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.2)', marginBottom: 8 }} onClick={() => setShowPanel(false)} />
-        
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{
+          flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20,
+          padding: 32, paddingBottom: 110, zIndex: 90, borderTop: '1px solid rgba(255,255,255,0.08)',
+        }}>
+          <button onClick={() => setShowPanel(false)} style={{
+            position: 'absolute', top: 12, right: 12, background: 'rgba(255,255,255,0.05)',
+            border: 'none', color: 'var(--text-muted)', width: 28, height: 28, borderRadius: '50%',
+            cursor: 'pointer', fontSize: 16
+          }}>×</button>
+
           {transcript && (
             <div style={{ animation: 'fadeInUp 0.4s both' }}>
               <p style={{ fontSize: 11, color: theme.primary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>You said</p>
@@ -249,7 +439,7 @@ export default function GlobalVoiceOrb({ theme, activeTab, onCrisis, onTabChange
             boxShadow: voiceState === 'idle' ? '0 8px 32px rgba(0,0,0,0.3)' : `0 0 30px ${getOrbShadow(voiceState, theme)}`,
             display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
             transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-            animation: voiceState === 'listening' ? 'orbPulse 1s infinite' : 'none',
+            animation: (voiceState === 'listening' || voiceState === 'speaking') ? 'orbPulse 1.5s infinite' : 'none',
             position: 'relative', overflow: 'hidden', backdropFilter: 'blur(10px)',
           }}
         >
@@ -258,6 +448,7 @@ export default function GlobalVoiceOrb({ theme, activeTab, onCrisis, onTabChange
             opacity: voiceState === 'idle' ? 0.2 : 0.8, filter: 'blur(2px)',
           }} />
           {voiceState === 'idle' && !loadingModels && <div style={{ position: 'absolute', fontSize: 20 }}>🎙️</div>}
+          {(voiceState === 'listening' || voiceState === 'speaking' || voiceState === 'processing') && !loadingModels && <div style={{ position: 'absolute', fontSize: 20 }}>⏹️</div>}
           {loadingModels && <div style={{ position: 'absolute', inset: 0, border: `2px solid ${theme.primary}`, borderRadius: '50%', borderTopColor: 'transparent', animation: 'orbSpin 1s linear infinite' }} />}
         </button>
       </div>

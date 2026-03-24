@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { session, useSession, notify, setTask, setSteps, addJournalEntry } from '../../focuscoach/sessionState.js'
+import { session, useSession, notify, setTask, setSteps, addJournalEntry, setWeeklyReflection, claimVoice, releaseVoice } from '../../focuscoach/sessionState.js'
 import buildSystemPrompt from '../../focuscoach/systemPrompt.js'
 import usePomodoro from '../../focuscoach/usePomodoro.js'
 import VoiceOrb from '../VoiceOrb.jsx'
@@ -8,10 +8,12 @@ import TaskPanel from '../TaskPanel.jsx'
 import SessionSummaryCard from '../SessionSummaryCard.jsx'
 import { t } from '../../mindease/i18n.js'
 import {
-  VoicePipeline, ModelCategory, ModelManager,
+  ModelCategory, ModelManager,
   AudioCapture, AudioPlayback, SpeechActivity, EventBus
 } from '@runanywhere/web'
 import { VAD } from '@runanywhere/web-onnx'
+import { getLang } from '../../mindease/i18n.js'
+import { getAIAction } from '../../mindease/aiUtils.js'
 
 function useModelLoader(category, coexist = false) {
   const [state, setState] = useState(() => ModelManager.getLoadedModel(category) ? 'ready' : 'idle')
@@ -60,8 +62,13 @@ export default function FocusTab({ theme, onCrisis }) {
   const [celebrationMsg, setCelebrationMsg] = useState('')
   const [prevPomodoroCount, setPrevPomodoroCount] = useState(0)
   const micRef = useRef(null)
-  const pipelineRef = useRef(null)
   const vadUnsubRef = useRef(null)
+  const silenceTimerRef = useRef(null)
+  const lastVadStateRef = useRef(SpeechActivity.Ended)
+  const convHistoryRef = useRef([])
+  const audioBufferRef = useRef([])
+  const partialProcessingRef = useRef(false)
+  const partialTimerRef = useRef(null)
 
   useEffect(() => {
     if (currentSession.pomodoroCount > 0) {
@@ -83,7 +90,21 @@ export default function FocusTab({ theme, onCrisis }) {
     setPrevPomodoroCount(currentSession.pomodoroCount)
   }, [currentSession.pomodoroCount])
 
-  useEffect(() => () => { micRef.current?.stop(); vadUnsubRef.current?.() }, [])
+  const voiceId = "focus-tab-voice"
+
+  useEffect(() => {
+    const unsubVoice = EventBus.shared.on('voice.stop', (evt) => {
+      if (evt?.except !== voiceId) stopListening()
+    })
+    return () => { 
+      unsubVoice()
+      micRef.current?.stop()
+      vadUnsubRef.current?.()
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current)
+      if (partialTimerRef.current) clearInterval(partialTimerRef.current)
+      releaseVoice(voiceId)
+    }
+  }, [])
 
   const allReady = [llmLoader, sttLoader, ttsLoader, vadLoader].every(l => l.state === 'ready')
 
@@ -98,67 +119,120 @@ export default function FocusTab({ theme, onCrisis }) {
     }))
   }
 
+  const speakResponse = useCallback(async (text) => {
+    const tts = ModelManager.getLoadedModel(ModelCategory.SpeechSynthesis)
+    if (!tts) return
+    setVoiceState('speaking')
+    setResponse(text)
+    try {
+      const synthFunc = getAIAction(tts, ['synthesize', 'generate', 'speak'])
+      if (!synthFunc) throw new Error('TTS match failed')
+      const res = await synthFunc(text)
+      const { audio, sampleRate } = typeof res === 'object' && res.audio ? res : { audio: res, sampleRate: 16000 }
+      const p = new AudioPlayback({ sampleRate })
+      await p.play(audio, sampleRate); p.dispose()
+    } catch (e) { console.error('TTS failed:', e) }
+    setVoiceState('idle')
+  }, [])
+
   const processSpeech = useCallback(async (audioData) => {
-    if (!pipelineRef.current) pipelineRef.current = new VoicePipeline()
-    micRef.current?.stop(); vadUnsubRef.current?.()
     setVoiceState('processing')
     try {
-      await pipelineRef.current.processTurn(audioData, {
-        systemPrompt: buildSystemPrompt(session), maxTokens: 120, temperature: 0.7,
-      }, {
-        onTranscription: (text) => {
-          setTranscript(text)
-          pomodoro.handleVoiceCommand(text)
-        },
-        onResponseToken: (_t, acc) => setResponse(acc),
-        onResponseComplete: (text) => {
-          if (text.startsWith('CRISIS_DETECTED:')) {
-            onCrisis(); setResponse(text.replace('CRISIS_DETECTED:', '').trim())
-          } else {
-            setResponse(text)
-          }
-          const steps = parseSteps(text)
-          if (steps.length >= 2) setSteps(steps)
-          if (session.mode === 'weekly') {
-            const { setWeeklyReflection } = require('../../focuscoach/sessionState.js')
-            setWeeklyReflection(text)
-          }
-        },
-        onSynthesisComplete: async (audio, sr) => {
-          setVoiceState('speaking')
-          const p = new AudioPlayback({ sampleRate: sr })
-          await p.play(audio, sr); p.dispose()
-        },
-        onStateChange: (s) => {
-          if (s === 'processingSTT') setVoiceState('processing')
-          if (s === 'generatingResponse') setVoiceState('processing')
-          if (s === 'playingTTS') setVoiceState('speaking')
-        },
+      const currentLang = getLang();
+      let stt = ModelManager.getLoadedModel(ModelCategory.SpeechRecognition);
+      if (!stt) throw new Error('STT model not found')
+
+      const transcribeFn = getAIAction(stt, ['transcribe', 'predict', 'generate']);
+      const result = await transcribeFn(new Float32Array(audioData), { language: currentLang });
+      const text = (typeof result === 'string' ? result : (result.text || '')).trim();
+      
+      if (!text) { setVoiceState('idle'); return }
+      setTranscript(text)
+      pomodoro.handleVoiceCommand(text)
+
+      const systemPrompt = buildSystemPrompt(session)
+      const llm = ModelManager.getLoadedModel(ModelCategory.Language)
+      const genFunc = getAIAction(llm, ['chat', 'generate', 'predict'])
+      
+      const res = await genFunc(`${systemPrompt}\n\nUser: ${text}\nAssistant:`, {
+        maxTokens: 100, stop: ['User:', '\n\n']
       })
-    } catch (err) { setLoadError(err.message) }
-    setVoiceState('idle'); setAudioLevel(0)
-  }, [pomodoro, onCrisis])
+
+      const cleanRes = res.replace('CRISIS_DETECTED:', '').trim()
+      if (res.includes('CRISIS_DETECTED')) onCrisis && onCrisis(cleanRes)
+
+      const steps = parseSteps(cleanRes)
+      if (steps.length >= 2) setSteps(steps)
+      if (session.mode === 'weekly') setWeeklyReflection(cleanRes)
+
+      await speakResponse(cleanRes)
+    } catch (err) { 
+      console.error('Speech process failed:', err)
+      setLoadError(err.message)
+      setVoiceState('idle')
+    }
+  }, [pomodoro, onCrisis, speakResponse])
 
   const startListening = useCallback(async () => {
     setTranscript(''); setResponse(''); setLoadError(null)
     const ok = allReady || await ensureModels()
     if (!ok) return
+    claimVoice(voiceId)
     setVoiceState('listening')
     const mic = new AudioCapture({ sampleRate: 16000 })
     micRef.current = mic
     VAD.reset()
     vadUnsubRef.current = VAD.onSpeechActivity((activity) => {
+      console.log("[FocusTab] VAD Activity:", activity)
+      if (activity !== lastVadStateRef.current) {
+        lastVadStateRef.current = activity
+      }
+      if (activity === SpeechActivity.Started) {
+        audioBufferRef.current = [] 
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current); silenceTimerRef.current = null
+        }
+      }
       if (activity === SpeechActivity.Ended) {
-        const seg = VAD.popSpeechSegment()
-        if (seg && seg.samples.length > 1600) processSpeech(seg.samples)
+        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current)
+        silenceTimerRef.current = setTimeout(() => {
+          const seg = VAD.popSpeechSegment()
+          if (seg && seg.samples.length > 3200) {
+            processSpeech(seg.samples)
+            silenceTimerRef.current = null
+          } else {
+            stopListening()
+          }
+        }, 1200)
       }
     })
-    await mic.start((chunk) => VAD.processSamples(chunk), (level) => setAudioLevel(level))
+
+    partialTimerRef.current = setInterval(async () => {
+      if (lastVadStateRef.current === SpeechActivity.Started && !partialProcessingRef.current && audioBufferRef.current.length > 8000) {
+        partialProcessingRef.current = true
+        try {
+          const stt = ModelManager.getLoadedModel(ModelCategory.SpeechRecognition)
+          if (stt) {
+            const transcribeFn = getAIAction(stt, ['transcribe', 'predict', 'generate'])
+            const result = await transcribeFn(new Float32Array(audioBufferRef.current), { language: getLang() })
+            const text = (typeof result === 'string' ? result : (result.text || '')).trim()
+            if (text && lastVadStateRef.current === SpeechActivity.Started) setTranscript(text)
+          }
+        } catch (e) {} finally { partialProcessingRef.current = false }
+      }
+    }, 1200)
+
+    await mic.start((chunk) => {
+      VAD.processSamples(chunk)
+      if (lastVadStateRef.current === SpeechActivity.Started) audioBufferRef.current.push(...chunk)
+    }, (level) => setAudioLevel(level))
   }, [allReady, ensureModels, processSpeech])
 
   const stopListening = useCallback(() => {
     micRef.current?.stop(); vadUnsubRef.current?.()
+    if (partialTimerRef.current) clearInterval(partialTimerRef.current)
     setVoiceState('idle'); setAudioLevel(0)
+    releaseVoice(voiceId)
   }, [])
 
   const pendingLoaders = [

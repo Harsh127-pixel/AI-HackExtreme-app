@@ -1,11 +1,14 @@
-import { useState } from 'react'
-import { useSession, setWellnessMode, setSleepQuality, session } from '../../focuscoach/sessionState.js'
+import { useState, useRef, useEffect } from 'react'
+import { useSession, setWellnessMode, setSleepQuality, setVoiceOrbEnabled, session, notify } from '../../focuscoach/sessionState.js'
 import { getTheme } from '../../mindease/theme.js'
 import MoodGraph from '../MoodGraph.jsx'
 import useStreak from '../../mindease/useStreak.js'
 import ProgressInsights from '../ProgressInsights.jsx'
 import ExportData from '../ExportData.jsx'
 import { t } from '../../mindease/i18n.js'
+import { AudioCapture, AudioPlayback, ModelManager, ModelCategory } from '@runanywhere/web'
+import { VAD } from '@runanywhere/web-onnx'
+import DebriefMode from '../DebriefMode.jsx'
 
 const MOODS = [
   { id: 'okay',       emoji: '😊', label: 'Good',     color: '#34D399' },
@@ -36,6 +39,89 @@ export default function HomeTab({ theme }) {
   const [sleepSelected, setSleepSelected] = useState(currentSession.sleepQuality)
   const [showData, setShowData] = useState(false)
   const { streak, longestStreak } = useStreak()
+  
+  // Voice Check-In State
+  const [voiceDone, setVoiceDone] = useState(() => localStorage.getItem('mindease_voice_checkin') === new Date().toDateString())
+  const [vStreak, setVStreak] = useState(() => parseInt(localStorage.getItem('mindease_voice_streak') || '0'))
+  const [showDebriefOverlay, setShowDebriefOverlay] = useState(false)
+  const [debriefDone, setDebriefDone] = useState(() => localStorage.getItem('mindease_debrief_date') === new Date().toDateString())
+  const [isRecording, setIsRecording] = useState(false)
+  const [timeLeft, setTimeLeft] = useState(60)
+  const [processing, setProcessing] = useState(false)
+  const micRef = useRef(null)
+  const timerRef = useRef(null)
+  const audioChunksRef = useRef([])
+
+  const startVoiceCheckin = async () => {
+    try {
+      setProcessing(true)
+      const mic = new AudioCapture({ sampleRate: 16000 })
+      micRef.current = mic
+      audioChunksRef.current = []
+      setIsRecording(true)
+      setTimeLeft(60)
+      setProcessing(false)
+
+      await mic.start((chunk) => {
+         audioChunksRef.current.push(...chunk)
+      })
+
+      timerRef.current = setInterval(() => {
+        setTimeLeft(v => {
+          if (v <= 1) { stopVoiceCheckin(); return 0 }
+          return v - 1
+        })
+      }, 1000)
+    } catch (e) { console.error(e); setProcessing(false) }
+  }
+
+  const stopVoiceCheckin = async () => {
+    if (!micRef.current) return
+    clearInterval(timerRef.current)
+    setIsRecording(false)
+    setProcessing(true)
+    
+    try {
+      const mic = micRef.current
+      mic.stop()
+      
+      const { STT } = await import('@runanywhere/web-onnx')
+      const result = await STT.transcribe(new Float32Array(audioChunksRef.current), { language: 'en' })
+      const text = result.text?.trim()
+      
+      if (text) {
+        const llm = ModelManager.getLoadedModel(ModelCategory.Language)
+        const genFunc = llm && (llm.generateText || llm.generate || llm.predict || llm.chat)?.bind(llm)
+        if (!genFunc) { setProcessing(false); return }
+        const res = await genFunc(`User just did their daily voice check-in and said: "${text}". Respond with one warm sentence reflecting back what you heard, then one short affirmation. Keep it under 2 sentences total.`, { maxTokens: 80 })
+        
+        const tts = ModelManager.getLoadedModel(ModelCategory.SpeechSynthesis)
+        if (tts) {
+           const synthFunc = (tts.synthesize || tts.generate || tts.speak)?.bind(tts)
+           if (synthFunc) {
+              const { audio, sampleRate } = await synthFunc(res)
+              const p = new AudioPlayback({ sampleRate })
+              await p.play(audio, sampleRate)
+              p.dispose()
+           }
+        }
+
+        // Update Streak
+        const today = new Date().toDateString()
+        const lastDate = localStorage.getItem('mindease_voice_checkin')
+        let newStreak = vStreak
+        if (lastDate !== today) {
+           const yesterday = new Date(Date.now() - 86400000).toDateString()
+           newStreak = lastDate === yesterday ? vStreak + 1 : 1
+           localStorage.setItem('mindease_voice_streak', newStreak.toString())
+           localStorage.setItem('mindease_voice_checkin', today)
+           setVStreak(newStreak)
+           setVoiceDone(true)
+        }
+      }
+    } catch (e) { console.error(e) }
+    finally { setProcessing(false) }
+  }
 
   const handleMood = (id) => { setMoodSelected(id); setWellnessMode(id) }
   const handleSleep = (id) => { setSleepSelected(id); setSleepQuality(id) }
@@ -50,8 +136,12 @@ export default function HomeTab({ theme }) {
     return opts[new Date().getDay() % opts.length]
   }
 
+  const isDebriefTime = hour >= 20 && hour <= 23 && !debriefDone
+
   return (
     <div style={{ padding: '24px 16px 40px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {showDebriefOverlay && <DebriefMode theme={theme} onClose={() => { setShowDebriefOverlay(false); setDebriefDone(true) }} />}
+      
       <style>{`
         .dashboard-grid { 
           display: grid; 
@@ -68,25 +158,109 @@ export default function HomeTab({ theme }) {
       `}</style>
 
       {/* Greeting */}
-      <div style={{ marginBottom: 8 }} className="full-width">
-        <h2 style={{ fontSize: 32, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-1px' }}>
-          {greeting} 👋
-        </h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: 16, marginTop: 8, lineHeight: 1.6, maxWidth: 600 }}>
-          {moodMsg()}
-        </p>
+      <div style={{ marginBottom: 4 }} className="full-width">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h2 style={{ fontSize: 32, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-1px' }}>
+              {greeting} 👋
+            </h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 16, marginTop: 8, lineHeight: 1.6, maxWidth: 600 }}>
+              {moodMsg()}
+            </p>
+          </div>
+          
+          <div 
+            className="glass-card"
+            style={{
+              width: 280, padding: '20px 24px',
+              border: `1.5px solid ${voiceDone ? 'var(--success)40' : theme.primary + '50'}`,
+              boxShadow: voiceDone ? '0 8px 32px var(--success)10' : `0 8px 32px ${theme.glow}30`,
+              animation: !voiceDone ? 'softGlow 4s infinite ease-in-out' : 'none'
+            }}
+          >
+            <style>{`
+              @keyframes softGlow { 0% { box-shadow: 0 0 10px ${theme.primary}20; } 50% { box-shadow: 0 0 25px ${theme.primary}40; } 100% { box-shadow: 0 0 10px ${theme.primary}20; } }
+              .ring { transition: stroke-dashoffset 0.3s; transform: rotate(-90deg); transform-origin: 50% 50%; }
+            `}</style>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+              <div style={{ fontSize: 20 }}>🎙️</div>
+              <div>
+                <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>Daily Ritual</p>
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>{vStreak} day streak</p>
+              </div>
+            </div>
+
+            {!voiceDone ? (
+              isRecording ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ position: 'relative', width: 40, height: 40 }}>
+                    <svg width="40" height="40">
+                      <circle cx="20" cy="20" r="18" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="3" />
+                      <circle className="ring" cx="20" cy="20" r="18" fill="none" stroke={theme.primary} strokeWidth="3"
+                        strokeDasharray={2 * Math.PI * 18}
+                        strokeDashoffset={(2 * Math.PI * 18) * (1 - timeLeft/60)}
+                      />
+                    </svg>
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>
+                      {timeLeft}
+                    </div>
+                  </div>
+                  <button onClick={stopVoiceCheckin} className="btn" style={{ padding: '6px 12px', fontSize: 12, background: 'var(--danger)', color: 'white', border: 'none', borderRadius: 10 }}>Stop</button>
+                </div>
+              ) : (
+                <button 
+                  onClick={startVoiceCheckin} 
+                  disabled={processing}
+                  className="btn" 
+                  style={{ width: '100%', padding: '10px', fontSize: 13, background: theme.primary, color: 'white', border: 'none', borderRadius: 12, fontWeight: 600 }}
+                >
+                  {processing ? 'Loading...' : 'Start 60s Check-in'}
+                </button>
+              )
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--success)' }}>
+                <span style={{ fontSize: 16 }}>✓</span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Completed today</span>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
+
+      {isDebriefTime && (
+        <div style={{
+          background: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 100%)',
+          borderRadius: 24, padding: '24px', position: 'relative', overflow: 'hidden',
+          border: '1px solid rgba(139, 92, 246, 0.3)', 
+          animation: 'debriefGlow 4s infinite ease-in-out',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+        }}>
+          <style>{`
+            @keyframes debriefGlow { 0% { box-shadow: 0 0 10px rgba(139, 92, 246, 0.1); } 50% { box-shadow: 0 0 30px rgba(139, 92, 246, 0.3); } 100% { box-shadow: 0 0 10px rgba(139, 92, 246, 0.1); } }
+          `}</style>
+          <div>
+             <h3 style={{ fontSize: 18, fontWeight: 800, color: 'white', marginBottom: 6 }}>🌙 End of Day Debrief</h3>
+             <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', margin: 0 }}>How was your day? 30 seconds, just for you.</p>
+          </div>
+          <button onClick={() => setShowDebriefOverlay(true)} className="btn" style={{
+            background: 'white', color: '#1E1B4B', padding: '10px 24px', borderRadius: 14, fontWeight: 700, border: 'none'
+          }}>Start</button>
+        </div>
+      )}
 
       <div className="dashboard-grid">
 
         {/* Streak + Quick stats row */}
         <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 16 }}>
-          <div style={{
-            background: `linear-gradient(135deg, ${theme.primary}18, ${theme.accent}10)`,
-            border: `1.5px solid ${theme.primary}30`,
-            borderRadius: 24, padding: '20px 24px',
-            display: 'flex', alignItems: 'center', gap: 16,
-          }}>
+          <div 
+            className="glass-card"
+            style={{
+              background: `linear-gradient(135deg, ${theme.primary}22, ${theme.accent}15)`,
+              border: `1.5px solid ${theme.primary}40`,
+              padding: '24px', display: 'flex', alignItems: 'center', gap: 20,
+            }}
+          >
             <div style={{
               width: 52, height: 52, borderRadius: 16,
               background: theme.primary + '22',
@@ -103,12 +277,7 @@ export default function HomeTab({ theme }) {
             </div>
           </div>
 
-          <div style={{
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 24, padding: '20px',
-            textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center'
-          }}>
+          <div className="glass-card" style={{ padding: '24px', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <div style={{ fontSize: 24 }}>🍅</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', marginTop: 6 }}>
               {currentSession.pomodoroCount}
@@ -118,7 +287,7 @@ export default function HomeTab({ theme }) {
         </div>
 
         {/* Mood selector */}
-        <div className="card" style={{ borderRadius: 24, padding: 24 }}>
+        <div className="glass-card" style={{ padding: 28 }}>
           <p className="section-label" style={{ marginBottom: 16, fontSize: 15 }}>{t('mood_today')}</p>
           <div style={{ display: 'flex', gap: 10 }}>
             {MOODS.map(m => {
@@ -143,7 +312,7 @@ export default function HomeTab({ theme }) {
         </div>
 
         {/* Sleep check-in */}
-        <div className="card" style={{ borderRadius: 24, padding: 24 }}>
+        <div className="glass-card" style={{ padding: 28 }}>
           <p className="section-label" style={{ marginBottom: 16, fontSize: 15 }}>{t('sleep_quality')}</p>
           <div style={{ display: 'flex', gap: 10 }}>
             {SLEEP.map(s => {
@@ -195,19 +364,47 @@ export default function HomeTab({ theme }) {
 
         {/* Data management icon */}
         <div className="card full-width" style={{ borderRadius: 24, padding: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: showData ? 20 : 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: showData ? 24 : 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>⚙️</div>
               <div>
-                <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Privacy & Data</p>
-                <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4, margin: 0 }}>All data stays locally on your device.</p>
+                <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Privacy & Control</p>
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4, margin: 0 }}>Manage your session & AI preferences.</p>
               </div>
             </div>
             <button className="btn btn-ghost" onClick={() => setShowData(v => !v)} style={{ padding: '8px 16px', borderRadius: 10 }}>
-              {showData ? 'Hide Settings' : 'Manage Data'}
+              {showData ? 'Hide Settings' : 'Manage Settings'}
             </button>
           </div>
-          {showData && <ExportData theme={theme} />}
+          {showData && (
+            <div style={{ marginTop: 24, animation: 'fadeIn 0.4s both' }}>
+              <div key="orb-toggle" style={{ 
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
+                padding: '20px', background: 'rgba(255,255,255,0.03)', borderRadius: 20,
+                border: '1px solid var(--border-subtle)', marginBottom: 20
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ fontSize: 22 }}>🎙️</div>
+                  <div>
+                    <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>Voice Assistant Orb</p>
+                    <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>Global hands-free navigation & empathy</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setVoiceOrbEnabled(!currentSession.voiceOrbEnabled)}
+                  style={{
+                    padding: '8px 16px', borderRadius: 100, border: 'none',
+                    background: currentSession.voiceOrbEnabled ? 'var(--success)' : 'rgba(255,255,255,0.1)',
+                    color: currentSession.voiceOrbEnabled ? '#000' : 'white', cursor: 'pointer',
+                    fontSize: 12, fontWeight: 800, transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                  }}
+                >
+                  {currentSession.voiceOrbEnabled ? 'ENABLED' : 'DISABLED'}
+                </button>
+              </div>
+              <ExportData theme={theme} />
+            </div>
+          )}
         </div>
       </div>
     </div>

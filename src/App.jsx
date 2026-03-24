@@ -14,6 +14,7 @@ import ReflectTab from './components/tabs/ReflectTab.jsx'
 import FocusTab from './components/tabs/FocusTab.jsx'
 import GlobalVoiceOrb from './components/GlobalVoiceOrb.jsx'
 import SOSMode from './components/SOSMode.jsx'
+import OfflineStatus from './components/OfflineStatus.jsx'
 
 const TABS = [
   { id: 'home',    icon: HomeIcon },
@@ -179,7 +180,7 @@ export function App() {
   )
 
   if (!moodDone && !session.moodCheckedIn) return (
-    <MoodCheckIn onComplete={() => setMoodDone(true)} />
+    <MoodCheckIn onComplete={() => setMoodDone(true)} onCrisis={handleCrisis} />
   )
 
   const theme = getTheme(currentSession.wellnessMode)
@@ -194,9 +195,9 @@ export function App() {
       position: 'relative',
     }}>
       <style>{`
-        .sidebar { display: flex; flex-direction: column; width: 280px; background: rgba(8,12,20,0.95); border-right: 1px solid var(--border-subtle); padding: 32px 24px; z-index: 50; }
+        .sidebar { display: flex; flex-direction: column; width: 280px; background: rgba(8,12,20,0.6); backdrop-filter: blur(24px) saturate(180%); border-right: 1px solid rgba(255,255,255,0.06); padding: 32px 24px; z-index: 50; }
         .content-container { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; background: var(--bg-base); }
-        .main-content { flex: 1; overflow-y: auto; width: 100%; margin: 0 auto; max-width: 1000px; padding: 40px; }
+        .main-content { flex: 1; overflow-y: auto; width: 100%; margin: 0 auto; max-width: 1100px; padding: 48px; scroll-behavior: smooth; }
         .mobile-only { display: none; }
 
         @media (max-width: 1023px) {
@@ -212,11 +213,12 @@ export function App() {
       <aside className="sidebar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 48 }}>
           <div style={{
-            width: 40, height: 40, borderRadius: 12,
+            width: 40, height: 40, borderRadius: 14,
             background: `linear-gradient(135deg, ${theme.primary}, ${theme.accent})`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
+            boxShadow: `0 8px 16px ${theme.primary}30`
           }}>🧠</div>
-          <span style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
+          <span style={{ fontSize: 22, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.8px' }}>
             {t('appName')}
           </span>
         </div>
@@ -284,12 +286,15 @@ export function App() {
           </div>
         </main>
 
-        <GlobalVoiceOrb 
-          theme={theme} 
-          activeTab={activeTab} 
-          onTabChange={handleTabChange}
-          onCrisis={handleCrisis}
-        />
+        <OfflineStatus theme={theme} />
+        {currentSession.voiceOrbEnabled && (
+          <GlobalVoiceOrb 
+            theme={theme} 
+            activeTab={activeTab} 
+            onTabChange={handleTabChange}
+            onCrisis={handleCrisis}
+          />
+        )}
 
         {/* Mobile Navigation */}
         <nav className="mobile-only" style={{

@@ -1,3 +1,4 @@
+import { EventBus } from '@runanywhere/web'
 // Plain mutable state object
 export const session = {
   mode: 'idle',
@@ -12,6 +13,7 @@ export const session = {
   wellnessMode: null,        // null | 'anxiety' | 'depression' | 'burnout' | 'stress' | 'okay'
   moodCheckedIn: false,      // whether user has done today's check-in
   moodHistory: [],           // array of { mood, timestamp } saved to localStorage
+  voiceActiveComponent: null, // Track which component is using the voice system
   sleepQuality: null,        // null | 'great' | 'okay' | 'poor' | 'terrible'
   sleepCheckedIn: false,
   gratitudeEntries: [],      // array of { id, items: [str,str,str], timestamp }
@@ -22,6 +24,7 @@ export const session = {
   pomodoroRunning: false,
   pomodoroSecondsLeft: 25 * 60,
   pomodoroDuration: 25 * 60,
+  voiceOrbEnabled: localStorage.getItem('mindease_voice_orb_enabled') !== 'false'
 }
 
 // Load persistence on init
@@ -169,6 +172,21 @@ export function setWeeklyReflection(text) {
   notify()
 }
 
+export function claimVoice(componentId) {
+  if (session.voiceActiveComponent && session.voiceActiveComponent !== componentId) {
+    EventBus.shared.emit('voice.stop', { except: componentId })
+  }
+  session.voiceActiveComponent = componentId
+  notify()
+}
+
+export function releaseVoice(componentId) {
+  if (session.voiceActiveComponent === componentId) {
+    session.voiceActiveComponent = null
+    notify()
+  }
+}
+
 export function toggleSOS(active) {
   session.sosActive = active
   notify()
@@ -176,6 +194,12 @@ export function toggleSOS(active) {
 
 export function setPomodoroState(state) {
   Object.assign(session, state)
+  notify()
+}
+
+export function setVoiceOrbEnabled(enabled) {
+  session.voiceOrbEnabled = enabled
+  localStorage.setItem('mindease_voice_orb_enabled', enabled.toString())
   notify()
 }
 

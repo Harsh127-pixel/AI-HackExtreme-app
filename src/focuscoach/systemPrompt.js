@@ -51,11 +51,24 @@ export default function buildSystemPrompt(session) {
     const recentJournal = session.journalEntries.slice(-7).map(e => e.text).join(' | ')
     const recentMoods = session.moodHistory.slice(-7).map(e => e.mood).join(', ')
     prompt += ` Generate a warm, honest weekly reflection summary based on: moods this week: [${recentMoods}], journal entries: [${recentJournal}]. Note patterns, celebrate progress, name one thing to watch next week. Keep it to 4-5 sentences, personal and warm.`
+  } else if (session.mode === 'sleep') {
+    const scene = { 
+      anxiety: 'a calm, infinite phosphorescent ocean at night with rhythmic waves', 
+      depression: 'a warm, golden sun setting over a quiet meadow filled with soft grass', 
+      burnout: 'an ancient, mossy forest with a small, glowing stream and tall trees', 
+      stress: 'a snowy mountain peak with a warm, crackling fire in a cabin', 
+      okay: 'a peaceful garden with floating glowing lanterns' 
+    }[wellness] || 'a peaceful garden'
+    prompt += ` The user wants a sleep story. Generate a 5-sentence calming narrative starting with "Close your eyes..." and describing ${scene}. Use vivid, sensory language. Each sentence should be slow and soothing. End with deep peace.`
   } else {
     prompt += ` The user is on the home screen. Greet them warmly and ask how they are feeling or what they need today.`
   }
 
-  prompt += ` Stats: pomodoros: ${session.pomodoroCount}, frustration signals: ${session.frustrationCount}. CRITICAL: If the user expresses crisis (self-harm, not wanting to exist, severe hopelessness), start your response with exactly "CRISIS_DETECTED:" then respond with warmth and suggest helplines.`
+  prompt += ` Stats: pomodoros: ${session.pomodoroCount}, frustration signals: ${session.frustrationCount}.`
+  if (session.voiceEmotionScore > 0.7) {
+    prompt += ` VOICE TONE ALERT: User sounds distressed from voice patterns alone (agitated or rushed). Be extra gentle, validate feelings immediately, and use a slower speaking pace.`
+  }
+  prompt += ` CRITICAL: If the user expresses crisis (self-harm, not wanting to exist, severe hopelessness), start your response with exactly "CRISIS_DETECTED:" then respond with warmth and suggest helplines.`
 
   return prompt
 }

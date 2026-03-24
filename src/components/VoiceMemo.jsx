@@ -4,7 +4,9 @@ import {
   SpeechActivity, EventBus, AudioPlayback 
 } from '@runanywhere/web'
 import { VAD } from '@runanywhere/web-onnx'
+import { getAIAction } from '../mindease/aiUtils.js'
 import { t, getLang } from '../mindease/i18n.js'
+import { claimVoice, releaseVoice } from '../focuscoach/sessionState.js'
 
 const STORAGE_KEY = 'mindease_voicememos'
 
@@ -26,10 +28,22 @@ export default function VoiceMemo({ theme }) {
   const vadUnsubRef = useRef(null)
   const chunksRef = useRef([])
 
+  const voiceId = "voice-memo-voice"
+
   useEffect(() => {
+    const unsubVoice = EventBus.shared.on('voice.stop', (evt) => {
+      if (evt?.except !== voiceId) {
+        micRef.current?.stop()
+        vadUnsubRef.current?.()
+        setRecording(false)
+        releaseVoice(voiceId)
+      }
+    })
     return () => {
+      unsubVoice()
       micRef.current?.stop()
       vadUnsubRef.current?.()
+      releaseVoice(voiceId)
     }
   }, [])
 
@@ -57,7 +71,9 @@ Respond with 2-3 sentences of warm empathy and one gentle reflection question. K
 Response:`
 
     try {
-      const response = await llm.generateText(prompt, { maxTokens: 100, stop: ['\n\n'] })
+      const genFunc = getAIAction(llm)
+      if (!genFunc) return null
+      const response = await genFunc(prompt, { maxTokens: 100, stop: ['\n\n'] })
       return response.trim()
     } catch (e) {
       console.error('LLM failed:', e)
@@ -65,11 +81,27 @@ Response:`
     }
   }
 
+  const getMoodArc = async (text) => {
+    const llm = ModelManager.getLoadedModel(ModelCategory.Language)
+    if (!llm) return null
+    const prompt = `Analyze this journal entry and return ONLY a JSON array of 5 numbers between -1 and 1 representing the emotional arc across the entry. -1 is very negative, 0 is neutral, 1 is very positive. Return only the JSON array, nothing else: "${text}"`
+    try {
+      const genFunc = getAIAction(llm)
+      if (!genFunc) return null
+      const res = await genFunc(prompt, { maxTokens: 40 })
+      const match = res.match(/\[.*\]/)
+      return match ? JSON.parse(match[0]) : null
+    } catch (e) { console.error('MoodArc failed:', e); return null }
+  }
+
   const speakResponse = async (text) => {
     const tts = ModelManager.getLoadedModel(ModelCategory.SpeechSynthesis)
     if (!tts) return
     try {
-      const { audio, sampleRate } = await tts.synthesize(text)
+      const synthFunc = getAIAction(tts, ['synthesize', 'generate', 'speak'])
+      if (!synthFunc) return
+      const res = await synthFunc(text)
+      const { audio, sampleRate } = typeof res === 'object' && res.audio ? res : { audio: res, sampleRate: 16000 }
       const player = new AudioPlayback({ sampleRate })
       await player.play(audio, sampleRate)
       player.dispose()
@@ -84,6 +116,7 @@ Response:`
       alert("Voice models not ready. Please download them first.")
       return
     }
+    claimVoice(voiceId)
     setRecording(true)
     chunksRef.current = []
     const mic = new AudioCapture({ sampleRate: 16000 })
@@ -121,10 +154,12 @@ Response:`
       
       if (text) {
         const aiResponse = await getAIResponse(text)
+        const moodArc = await getMoodArc(text)
         const memo = {
           id: Date.now(),
           text,
           aiResponse,
+          moodArc,
           timestamp: new Date().toISOString(),
           duration: Math.round(chunksRef.current.length / 16000),
         }
@@ -199,6 +234,26 @@ Response:`
                 }}>
                   <span style={{ flexShrink: 0 }}>✨</span>
                   <span>{memo.aiResponse}</span>
+                </div>
+              )}
+
+              {memo.moodArc && (
+                <div style={{ marginTop: 14 }}>
+                  <p style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Emotional Arc</p>
+                  <div title={`Started ${memo.moodArc[0] > 0.3 ? 'high' : (memo.moodArc[0] < -0.3 ? 'low' : 'neutral')} → Ended ${memo.moodArc[4] > 0.3 ? 'high' : (memo.moodArc[4] < -0.3 ? 'low' : 'neutral')}`} style={{
+                    width: '100%', height: 40, background: 'rgba(255,255,255,0.02)', borderRadius: 8, padding: '4px 12px',
+                    display: 'flex', alignItems: 'center', cursor: 'help'
+                  }}>
+                    <svg viewBox="0 0 100 30" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+                      {(() => {
+                        const avg = memo.moodArc.reduce((a,b)=>a+b,0)/5
+                        const color = avg > 0.2 ? '#22C55E' : (avg < -0.2 ? '#EF4444' : '#F59E0B')
+                        const getY = (v) => 15 - (v * 12)
+                        const d = `M 0,${getY(memo.moodArc[0])} C 25,${getY(memo.moodArc[1])} 75,${getY(memo.moodArc[3])} 100,${getY(memo.moodArc[4])}`
+                        return <path d={d} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
+                      })()}
+                    </svg>
+                  </div>
                 </div>
               )}
             </div>

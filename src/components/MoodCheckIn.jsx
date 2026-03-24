@@ -1,8 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { setWellnessMode } from '../focuscoach/sessionState.js'
+import { session, notify, setWellnessMode, claimVoice, releaseVoice } from '../focuscoach/sessionState.js'
 import { 
   ModelCategory, ModelManager, AudioCapture, 
-  SpeechActivity, EventBus 
+  SpeechActivity, EventBus, AudioPlayback 
 } from '@runanywhere/web'
 import { VAD } from '@runanywhere/web-onnx'
 import { t } from '../mindease/i18n.js'
@@ -15,7 +15,7 @@ const MOODS = [
   { id: 'burnout',    emoji: '🪫',  label: 'Burned out',         color: '#EF4444', desc: "Exhausted, running on empty" },
 ]
 
-export default function MoodCheckIn({ onComplete }) {
+export default function MoodCheckIn({ onComplete, onCrisis }) {
   const [selected, setSelected] = useState(null)
   const [hovered, setHovered] = useState(null)
   const [voiceState, setVoiceState] = useState('idle') // idle, listening, processing
@@ -25,6 +25,25 @@ export default function MoodCheckIn({ onComplete }) {
   
   const micRef = useRef(null)
   const vadUnsubRef = useRef(null)
+  const voiceId = "mood-checkin-voice"
+
+  useEffect(() => {
+    const unsubVoice = EventBus.shared.on('voice.stop', (evt) => {
+       if (evt?.except !== voiceId) stopListening()
+    })
+    return () => {
+      unsubVoice();
+      stopListening();
+      releaseVoice(voiceId);
+    }
+  }, [])
+
+  const stopListening = () => {
+     micRef.current?.stop()
+     vadUnsubRef.current?.()
+     setVoiceState('idle')
+     releaseVoice(voiceId)
+  }
 
   const ensureModels = async () => {
     setLoadingModels(true)
@@ -57,7 +76,8 @@ Return ONLY the token, nothing else.
 Token:`
 
     try {
-      const result = await llm.generateText(prompt, { maxTokens: 10, stop: ['\n'] })
+      const genFunc = llm.generateText ? llm.generateText.bind(llm) : llm.generate.bind(llm)
+      const result = await genFunc(prompt, { maxTokens: 10, stop: ['\n'] })
       const clean = result.toLowerCase().trim().replace(/[^a-z]/g, '')
       const match = MOODS.find(m => clean.includes(m.id))
       return match ? match.id : 'okay'
@@ -76,6 +96,18 @@ Token:`
       
       const { text } = await stt.transcribe(audioData)
       setTranscript(text)
+      
+      const crisisRegex = /i('m| am) not okay|help me|i can't (do|take|handle) this|i want to (die|disappear|give up)|i feel (hopeless|worthless)|panic|can't breathe|anxiety attack/i
+      if (crisisRegex.test(text)) {
+        onCrisis && onCrisis()
+        session.mode = 'sos'; notify()
+        const tts = ModelManager.getLoadedModel(ModelCategory.SpeechSynthesis)
+        if (tts) {
+          const { audio, sampleRate } = await tts.synthesize("I hear you. I'm right here with you. Let's breathe together. In... 2... 3... 4... Hold... 2... 3... 4... Out slowly... 2... 3... 4... 5... 6. You are safe.")
+          const p = new AudioPlayback({ sampleRate }); await p.play(audio, sampleRate); p.dispose()
+        }
+        return
+      }
       
       if (text.trim()) {
         const mood = await classifyMood(text)
@@ -101,6 +133,7 @@ Token:`
       return
     }
 
+    claimVoice(voiceId)
     setVoiceState('listening')
     setTranscript('')
     const mic = new AudioCapture({ sampleRate: 16000 })
